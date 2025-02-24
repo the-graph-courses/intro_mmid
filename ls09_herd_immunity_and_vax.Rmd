@@ -1,0 +1,123 @@
+---
+title: "Lesson 9 | Herd Immunity and Vaccination Thresholds"
+output:
+  word_document:
+    toc: true
+    toc_depth: '2'
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    css: here::here("global/style/style.css")
+    highlight: kate
+editor_options:
+  markdown:
+    wrap: none
+  canonical: true
+  chunk_output_type: inline
+---
+
+```{r, echo = F, message = F, warning = F}
+# Functions
+source(here::here("global/functions/lesson_functions.R"))
+```
+
+------------------------------------------------------------------------
+
+## Introduction {.unnumbered}
+
+In this lesson, we will explore the concepts of herd immunity and the vaccination threshold necessary to control the spread of infectious diseases. We will delve into the critical thresholds for population immunity, examining how the basic and effective reproduction numbers, $R_0$ and $R_e$, are used to understand the spread of an epidemic. Additionally, we will derive the mathematical basis for determining the critical proportion of susceptible individuals $S_c$) and learn how to calculate the vaccination threshold needed to achieve herd immunity. This knowledge is crucial for designing effective public health interventions aimed at halting disease outbreaks.
+
+# Learning Objectives {.unnumbered}
+
+By the end of this lesson, you should be able to:
+
+1)  Explain how the proportion of susceptible individuals impacts $R_e$ and the progression of an epidemic.
+2)  Derive the critical threshold for population immunity ($S_c$) and understand its significance in controlling disease spread.
+3)  Calculate the vaccination threshold required to achieve herd immunity ($p_c$) and explain its importance in public health.
+4)  Discuss the practical implications of these thresholds for planning and implementing vaccination strategies.
+
+# Critical Threshold for Population Immunity (S~c~)
+
+The critical susceptible threshold, $S_c$ , is a key concept in controlling infectious diseases. It represents the proportion of the population that must remain susceptible for the disease to continue spreading. When the proportion of susceptibles falls below this threshold, the disease cannot sustain itself and the outbreak will decline.
+
+::: recap
+## The Anatomy of an Epidemic
+
+At the start of an epidemic, the number of cases grows exponentially, and this growth is proportional to the basic reproduction number, $R_0$.
+
+However, as the epidemic progresses, the pool of susceptible individuals is depleted, making the initial $R_0$ less applicable.
+
+To account for this change, we define an effective reproduction number, denoted as $R_e$, which better represents the current state of transmission.
+
+![](images/anatomy_epidemic_Re.png)
+
+The effective reproduction number, $R_e$, scales with the proportion of susceptible individuals in the population (expressed as $S/N$). This relationship can be represented by the equation $R_e$ = $R_0 S/N$.
+
+When $R_e$ drops below 1 ($R_e < 1$), each infected individual transmits the disease to fewer than one new person on average, which disrupts the chain of transmission and eventually halts the spread of the infection.
+:::
+
+## Derivation of S~c~
+
+NOTE FROM JANNE: Another implication/perspective of Sc is that it defines the "herd immunity" threshold (1-Sc); you already mention this but only briefly in 4.2. It might be intuitively easier to think about 1-Sc instead of Sc (i.e. when the proportion of the population who have already been infected [or gained immunity through vaccination] reaches 1-Sc, the disease will start to die out). I wouldn't emphasize the term "herd immunity" which is controversial and has been criticized; but it might be a concept that the students have heard.
+
+To derive the critical susceptible threshold $S_c$ , we begin by considering the effective reproduction number, $R_e$ which must be less than 1 for the disease to die out:
+
+$$ R_e = R_0 \times \frac{S}{N} < 1 $$
+
+Where:
+
+-   $R_0$ is the basic reproduction number
+
+-   $S$ is the number of susceptible individuals
+
+-   $N$ is the total population size
+
+We rearrange this inequality to solve for $S$ :
+
+$$ \frac{S}{N} < \frac{1}{R_0} $$
+
+Multiplying both sides by $N$ gives:
+
+$$ S < \frac{N}{R_0} $$
+
+This tells us that for the disease to start declining, the number of susceptible individuals must be less than $\frac{N}{R_0}$ . The critical proportion of susceptibles, $S_c$ , is then given by:
+
+$$ S_c = \frac{1}{R_0} $$
+
+This formula shows that $S_c$ is the inverse of the basic reproduction number. It quantifies the maximum allowable proportion of susceptible individuals in the population to prevent an epidemic. Reducing $S/N$ below this critical level through vaccination or natural immunity can effectively control the spread of the disease.
+
+::: watch-out
+$S_c$ **is a proportion, not a number**
+:::
+
+# Vaccination Threshold (*p~c~*)
+
+If, by vaccination, we can reduce proportion of susceptibles below a critical level, $S_c$, then $R_e$ \< 1 and infection cannot invade.
+
+Recall: $R_e = R_0 S/N$
+
+So, $S_c = 1/R_0$ represents $R_e = 1$ and will achieve our goal.
+
+So, critical vaccination proportion to eradicate is
+
+$p_c = 1 - S_c = 1 - 1/R_0$
+
+![](images/kr-R0intervention.png)
+
+# Implications
+
+Understanding $S_c$ helps in planning effective vaccination strategies. For example, if $R_0$ is 3, then at least two-thirds of the population must be immune (either through vaccination or past infection) to push $S/N$ below the critical threshold and prevent widespread transmission of the disease.
+
+# Conclusion {.unnumbered}
+
+In conclusion, understanding the effective reproduction number ($R_e$) and the critical susceptible threshold ($S_c$) is vital for evaluating and controlling the spread of infectious diseases. By reducing the proportion of susceptible individuals through vaccination, public health officials can decrease $R_e$ to below 1, thereby interrupting the transmission chain. The critical vaccination threshold ($p_c$) provides a clear target for immunization efforts to achieve herd immunity, ensuring that a sufficient portion of the population is protected. These concepts play an essential role in strategic decision-making for preventing and mitigating epidemics.
+
+# Contributors {.unlisted .unnumbered}
+
+The following team members contributed to this lesson:
+
+`r .tgc_contributors_list(ids = c("joy"))`
+
+`r .tgc_license()`

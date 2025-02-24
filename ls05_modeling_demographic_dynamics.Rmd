@@ -1,0 +1,906 @@
+---
+title: 'Lesson 5 | SIR Model with Demographics'
+output:
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+    css: !expr here::here("global/style/style.css")
+    highlight: kate
+editor_options:
+  markdown:
+    wrap: 100
+  canonical: true
+  chunk_output_type: inline
+---
+
+```{r, echo = F, message = F, warning = F}
+# Load packages 
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load(rlang, tidyverse, knitr, here, reactable, gt, flextable)
+
+# Source functions 
+source(here("global/functions/lesson_functions.R"))
+
+# Knitr options
+knitr::opts_chunk$set(warning = F, message = F, class.source = "tgc-code-block", error = T)
+```
+
+------------------------------------------------------------------------
+
+# Introduction {.unnumbered}
+
+In this lesson, we will extend the classic SIR model by first introducing **demographics**—the processes of birth and natural death. After establishing the fundamentals of incorporating these dynamics, we'll further refine our model to include **infection-induced deaths**. This progression will allow us to understand the effects of both natural and infection-specific mortality on disease dynamics.
+
+Today, you will learn how to modify the SIR model to incorporate both types of mortality and how to implement these modifications in R.
+
+Let's get started!
+
+# Learning Objectives {.unnumbered}
+
+By the end of this lesson, you should be able to:
+
+-   Understand the role of natural birth and death rates ($\mu$) and infection-induced deaths ($\alpha$) in the SIR model.
+-   Extend the SIR model to include natural birth and death rates ($\mu$) and infection-induced deaths ($\alpha$).
+-   Implement the modified SIR models in R.
+-   Analyze the differences between the classic SIR model, the model with demographic dynamics, and the model including infection-induced deaths.
+
+# Packages {.unnumbered}
+
+This lesson will require the following packages to be installed and loaded:
+
+```{r warning = F, message = F, echo = T}
+# Load packages 
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load(deSolve, # package to solve differential equations
+               tidyverse, # package that includes ggplot2
+               here)
+```
+
+# Introduction to Demographics
+
+The classic SIR model assumes a closed population with no births, deaths, or migration. To model real-world scenarios more accurately, we introduce **demographics**—the inclusion of birth and natural death rates.
+
+## Why Include Natural Birth and Death Rates?
+
+Including natural birth and death rates in the SIR model provides a more realistic representation of population dynamics, especially over longer time periods. These demographic factors ensure that the model not only tracks the spread of infection but also captures how the population itself evolves, impacting the number of susceptible, infected, and recovered individuals.This modification is crucial when:
+
+-   The epidemic spans several years.
+-   Birth and death rates significantly impact the susceptible population over time.
+
+::: key-point
+**Understanding Birth and Death Rates in Population Dynamics**
+
+When incorporating demographics into a model, the population size, denoted as 𝑃, changes over time due to the processes of birth and death. Specifically, the population increases with the number of births and decreases with the number of deaths. To capture these dynamics, we introduce two key parameters: the **birth rate** (𝑏) and the **death rate** (𝑚).
+
+The birth rate (𝑏) reflects the number of new individuals born **per person per unit of time**. For instance, if 𝑏 = 0.1, this implies that each individual contributes an average of 0.1 new births per time step. Therefore, for a population size of 𝑃 = 10, the number of new births in that time step would be 𝑏𝑃 = 0.1 × 10 = 1.
+
+Similarly, the death rate, 𝑚, indicates the proportion of the population that dies per individual per time step. The total number of deaths in one time step is calculated as 𝑚𝑃. For example, if 𝑚 = 0.05 and 𝑃 = 10, the number of deaths would be 𝑚𝑃 = 0.05 × 10 = 0.5.
+
+*For the simplification of this concept and lesson, we will assume that the birth rate and death rate are equal to each other. However, it is important to note that this may not always be the case in real-world scenarios, where these rates can vary significantly.*
+:::
+
+### Model Behavior and Implications of Demographics
+
+Adding birth and death rates to the SIR model affects the behavior of the system in several important ways, especially when modeling populations over long periods of time. Here’s what happens when we incorporate demographics:
+
+1.  **Endemic Equilibrium**: The continuous inflow of newborns into the **susceptible** compartment keeps the disease circulating in the population, potentially leading to an **endemic equilibrium**. This is where the number of infected individuals stabilizes over time, and the disease remains present at a low level without completely dying out.
+
+    ![Source: World Malaria Report 2023](images/estimated_malaria_cases_west_africa.png){width="489"}
+
+2.  **Disease Persistence**: In the basic SIR model, the disease will fade out after a large enough portion of the population has recovered. However, with births replenishing the susceptible population, the disease can **persist** indefinitely. This is particularly important for modeling diseases that never fully disappear, like seasonal flu or endemic infections.
+
+    ![Source: Weekly US Influenza Surveillance Report: Key Updates for Week 44, ending November 2, 2024](images/influenza_graph_2023_2024.png){width="512"}
+
+3.  **Cyclical Patterns**: In populations where the birth rate is high, the disease may exhibit **cyclical patterns**. New susceptible individuals enter the population regularly, and once they accumulate to a certain threshold, outbreaks may occur again. This leads to cycles of infection over time, which more accurately reflects long-term disease dynamics in the real world.
+
+4.  **Population Turnover**: By including natural deaths, we introduce **population turnover**—the replacement of individuals through birth and death. Infected individuals who would otherwise remain in the **infected** or **recovered** compartments are regularly removed from the population due to natural mortality, balancing the system and preventing any one compartment from indefinitely growing.
+
+### Key Insights from Demographics
+
+Incorporating demographics into the SIR model introduces the following critical insights:
+
+-   **Long-Term Disease Dynamics**: Over long time periods, this extended model captures how diseases behave in populations with continuous births and deaths. It accounts for both the inflow of susceptible individuals and the gradual removal of infected and recovered individuals through natural deaths.
+
+-   **More Realistic Epidemic Predictions**: The model with demographics provides a more realistic depiction of diseases that **persist** in populations over time, especially for endemic diseases. It also allows for the exploration of long-term interventions and public health strategies to manage such diseases.
+
+::: side-note
+**The Role of Migration in demographics**
+
+In addition to birth and death rates, migration—which includes both immigration (inflow) and emigration (outflow)—plays a crucial role in shaping population dynamics.
+
+For the purposes of modeling, migration and natural demographic dynamics can be considered analogous, as both result in changes to the total population size over time. While we will focus on natural births and deaths in this lesson, it's important to note that the situation for migration—comprising immigration (inflow) and emigration (outflow) — is conceptually similar.
+
+The key difference is that births typically add individuals to the susceptible (S) compartment (assuming no vertical transmission of the disease), while immigration could affect any of the compartments: susceptible (S), infected (I), or recovered (R). For meaningful modeling, immigration rates would need to reflect the epidemic situation in the origin of the immigrants, a factor that is often unknown. However, the overarching principle remains the same: the population changes over time due to these dynamics, influencing disease transmission and progression.
+
+![](images/sir_model_migration_simple.png){width="636"}
+:::
+
+# Modifying the SIR Model with Demographics
+
+In real-world populations, individuals are born and die continuously. Over long periods, it's essential to incorporate these **demographics** into our model to capture realistic disease dynamics.
+
+In the basic SIR model, we assumed a closed population, meaning that the population does not change over time. This assumption is reasonable for short-term outbreaks, but over longer periods, populations change through births and deaths, which can significantly influence disease transmission patterns. In this section, we'll extend the SIR model to include **natural births and deaths**, creating a more comprehensive model.
+
+::: side-note
+**Comparing Closed vs Open Population**
+
+Let's try to conceptualize the difference between closed and open populations using the **Bathtub Analogy** alongside the **SIR model diagrams**:
+
+**Closed Population** - no demographics (no births and deaths, nor immigration and emigration)
+
+![](images/closed_sir_bathtub_diagram.png){width="626"}
+
+**Open Population** - including natural births and deaths
+
+![](images/open_sir_bathtub_diagram.png){width="656"}
+
+*NOTE: The term* $\mu N$ representing the inflow of water encompasses the total population (N), where $N = S + I + R$.
+:::
+
+## Incorporating Births & Deaths
+
+In our extended model, newborns enter the population as **susceptible** individuals because they are not infected at birth. Therefore, the birth rate directly increases the **S** compartment. We assume that the birth rate is proportional to the total population size, and that newborns are immediately susceptible to the disease.
+
+Deaths can occur in any of the three compartments—**susceptible**, **infected**, or **recovered**. This means that individuals may die regardless of their disease status. Therefore, we apply the same death rate, $\mu$, across all compartments.
+
+For simplicity, let's also assume that the total population size will remain constant, at $N$. This is not always the case - if we, for example, model a disease over decades in a setting with high birth rate, the birth rate can be higher than death rate.
+
+## Conceptualizing Demographics
+
+Let's try to create a conceptual diagram that incorporates births and accounts for deaths in our SIR model. For this we will build on from our SIR model's conceptual diagram.
+
+::: recap
+**The SIR Model**
+
+![](images/sir_model_recap.png)
+:::
+
+Let's explore the SIR model with births and natural deaths!
+
+![](images/sir_model_vital_dynamics_intro.png){width="457"}
+
+This extended SIR model includes a new parameter ($\mu$) where:
+
+-   $\mu$ is the per capita birth and natural death rate (assumed to be equal to maintain a constant total population size).
+
+## Updated Differential Equations
+
+To mathematically represent the model, we modify the system of differential equations for each compartment:
+
+-   **Susceptible** individuals can increase through births and decrease by becoming infected or through natural deaths.
+
+    $$ \frac{dS}{dt} = \mu N - \beta SI - \mu S $$
+
+-   **Infected** individuals increase when susceptible individuals become infected, but they decrease through recovery or natural deaths.
+
+    $$ \frac{dI}{dt} = \beta SI - \gamma I - \mu I $$
+
+-   **Recovered** individuals increase when infected individuals recover, but they also decrease through natural deaths.
+
+    $$ \frac{dR}{dt} = \gamma I - \mu R $$
+
+where:
+
+-   $\mu$ is the per capita birth and natural death rate (assumed to be equal to maintain a constant total population size),
+-   $\beta$ is the transmission coefficient, representing the rate at which susceptible individuals become infected,
+-   $\gamma$ is the recovery rate, representing the rate at which infected individuals recover,
+-   $N = S + I + R$ is the total population size.
+-   The transmission is density-dependent
+
+::: key-point
+**Why is the Birth Rate** $\mu N$?
+
+The incoming birth rate is $\mu N$ because $\mu$ is the per capita rate at which individuals contribute to new births. Multiplying this rate by the total population $N$ provides the overall rate of new individuals entering the susceptible class. This assumes births are evenly contributed by all individuals, maintaining a balanced flow into the susceptible group.
+:::
+
+::: side-note
+**ODEs for Frequency-dependent Transmission**
+
+To mathematically represent the model for a frequency-dependent transmission, we modify the differential equations:
+
+$$ \frac{dS}{dt} = \mu N - \frac{\beta SI}{N} - \mu S $$
+
+$$ \frac{dI}{dt} = \frac{\beta SI}{N} - \gamma I - \mu I $$
+
+$$ \frac{dR}{dt} = \gamma I - \mu R $$
+
+where:
+
+-   $\mu$ is the per capita birth and natural death rate (assumed to be equal to maintain a constant total population size),
+-   $\beta$ is the transmission coefficient, representing the rate at which susceptible individuals become infected,
+-   $\gamma$ is the recovery rate, representing the rate at which infected individuals recover,
+-   $N = S + I + R$ is the total population size.
+-   The transmission is frequency-dependent
+:::
+
+# Implementing the SIR Model with Demographics in R
+
+Let's start by implementing the SIR model with natural birth and death rates in R. For this, we will use a generic example.
+
+## Step 1: Setting Initial Conditions and Parameters
+
+We begin by defining the initial conditions and parameters for the model:
+
+-   **Total population (N):** 100
+-   **Initial susceptible (S):** 99
+-   **Initial infected (I):** 1
+-   **Initial recovered (R):** 0
+-   **Transmission rate (β):** 0.003
+-   **Recovery rate (γ):** 0.1
+-   **Natural birth/death rate (μ):** 0.02
+-   **Time span:** 400 days
+
+Let's define this in R:
+
+```{r}
+# Define initial conditions
+initial_state <- c(S = 99, I = 1, R = 0)
+
+# Define parameters including birth and death rate
+parameters <- c(beta = 0.003,  # Transmission rate
+                gamma = 0.1,    # Recovery rate
+                mu = 0.02)      # Natural Birth/Death rate
+
+# Time span for simulation
+times <- seq(0, 400, by = 1)
+```
+
+## Step 2: Writing the SIR Model Function with Demographics
+
+Next, we define the SIR model function that incorporates demographics:
+
+```{r}
+sir_model_vital <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    
+    # Calculate total population size
+    N <- S + I + R
+    
+    # Rate of change with demographics
+    dS <- mu * N - beta * S * I - mu * S
+    dI <- beta * S * I - gamma * I - mu * I
+    dR <- gamma * I - mu * R
+    
+    # Return the rate of change
+    list(c(dS, dI, dR))
+  })
+}
+```
+
+## Step 3: Solving the Differential Equations
+
+We then use the `ode` function from the {deSolve} package to solve the differential equations:
+
+```{r}
+# Solve the modified SIR model with demographics
+sir_vital_out <- ode(
+  y = initial_state,
+  times = times,
+  func = sir_model_vital, 
+  parms = parameters
+)
+```
+
+## Step 4: Converting the Output to a Data Frame and Visualizing
+
+We now need to convert the output to a data frame and visualize the dynamics:
+
+```{r}
+# Convert to dataframe
+sir_vital_out <- as.data.frame(sir_vital_out)
+
+# Plot the results
+ggplot(sir_vital_out, aes(x = time)) +
+  geom_line(aes(y = S, color = "Susceptible")) +
+  geom_line(aes(y = I, color = "Infectious")) +
+  geom_line(aes(y = R, color = "Recovered")) +
+  labs(title = "SIR Model with Births and Deaths", x = "Time (days)", y = "Proportion of Population") +
+  scale_color_manual(values = c("Susceptible" = "#2F5597", "Infectious" = "#C00000", "Recovered" = "#548235")) +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+```
+
+## Interpretention and Implications
+
+In this model, with $\mu = 0.02$, we introduce a natural birth and death process:
+
+-   The susceptible population (S) decreases initially as people get infected but eventually stabilizes because new susceptible individuals are born at the same rate as deaths occur, maintaining a continuous influx into the susceptible category.
+-   The infected population (I) reaches a peak and then fluctuates around an equilibrium level due to the ongoing process of new births and deaths, preventing the disease from dying out completely.
+-   The recovered population (R) stabilizes as well, balancing the births and deaths within the system.
+
+As previously discussed, incorporating a birth/death rate causes the disease to reach an **endemic equilibrium**, allowing it to persist over time rather than disappearing, as it would without birth or death dynamics. The steady influx of newborns into the susceptible population ensures that the disease continues to circulate and stabilize, maintaining its prevalence over time.
+
+::: practice
+**Exercise 1**
+
+Modify the SIR model with demographics to include an **Exposed (E)** compartment, creating an SEIR model. The model should also incorporate **natural births and deaths** (i.e., include the birth/death rate $\mu$). Use the following parameters and conceptual diagram:
+
+-   Initial population: 1000 (with 990 susceptible, 5 exposed, 4 infected, and 1 recovered)
+-   Transmission rate ($\beta$): 0.002
+-   Progression rate from exposed to infected ($\sigma$): 0.1
+-   Recovery rate ($\gamma$): 0.05
+-   Birth/death rate ($\mu$): 0.01
+-   Transmission is density-dependent
+
+![](images/seir_model_mu.png){width="459"}
+
+**Tasks:**
+
+1.  Define the initial conditions and parameters for the SEIR model in R.
+2.  Write an R function to represent the SEIR model with natural births and deaths.
+3.  Solve the model over 200 days and plot the results using ggplot2.
+:::
+
+# Introducing Infection-Induced Deaths
+
+In some infectious diseases, the mortality caused directly by the infection can significantly influence the disease's dynamics. This concept is known as **infection-induced deaths**, where individuals succumb to the disease rather than dying from natural causes.
+
+## Why Include Infection-Induced Deaths?
+
+Infections like Ebola or severe strains of influenza lead to high mortality rates among those infected. In such scenarios, it's crucial to model the epidemic by considering the infection-induced death rate ($\alpha$) to understand the true impact of the disease on the population. This is particularly relevant when:
+
+-   The disease has a significant mortality rate, making infection-induced deaths a primary driver of population changes.
+
+### Key Implications of Incorporating Infection-Induced Deaths
+
+By incorporating only infection-induced deaths into the SIR model, we can observe the following effects:
+
+1.  **Direct Impact on Infected Population**: The infection-induced death rate ($\alpha$) specifically reduces the number of infected individuals, representing the direct fatalities caused by the disease.
+
+2.  **Altered Recovery and Disease Progression**: As some infected individuals die, fewer people recover, which alters the disease's progression through the population.
+
+3.  **Simplified Model**: Without the birth and natural death rates, the model focuses purely on disease transmission, recovery, and infection-induced mortality, making it clearer and easier to analyze.
+
+# Modifying the SIR Model to Include Infection-Induced Deaths
+
+To incorporate infection-induced deaths into the SIR model, we introduce the parameter $\alpha$. This modification gives us a more straightforward view of how the disease affects the population.
+
+## Conceptual Model
+
+Let's explore the SIR model with infection-induced deaths:
+
+![](images/sir_model_infection_deaths.png){width="457"}
+
+The simplified SIR model includes three compartments:
+
+-   **Susceptible (S)**: Individuals who can be infected.
+-   **Infected (I)**: Individuals who are currently infected and can either recover or die due to the disease.
+-   **Recovered (R)**: Individuals who have recovered and gained immunity.
+
+And three critical parameters:
+
+-   **Transmission coefficient (β)**: The rate at which susceptible individuals become infected.
+-   **Recovery rate (γ)**: The rate at which infected individuals recover.
+-   **Infection-induced deaths (α)**: The rate at which infected individuals die as a direct consequence of the disease.
+
+## Updated Differential Equations
+
+The differential equations for this modified SIR model are:
+
+-   **Susceptible (S)**: Individuals in this compartment decrease as they become infected.
+
+$$ \frac{dS}{dt} = -\beta SI $$
+
+-   **Infected (I)**: The infected population increases as susceptible individuals become infected and decreases as infected individuals either recover or die from the disease.
+
+$$ \frac{dI}{dt} = \beta SI - \gamma I - \alpha I $$
+
+-   **Recovered (R)**: Recovered individuals increase as infected individuals recover.
+
+$$ \frac{dR}{dt} = \gamma I $$
+
+where:
+
+-   $\beta$ is the transmission rate (rate at which susceptible individuals become infected),
+
+-   $\gamma$ is the recovery rate (rate at which infected individuals recover),
+
+-   $\alpha$ is the infection-induced death rate (rate at which infected individuals die from the disease).
+
+-   The transmission is density-dependent.
+
+::: side-note
+**ODEs for Frequency-dependent Transmission**
+
+To mathematically represent the model for a frequency-dependent transmission, we modify the differential equations:
+
+$$ \frac{dS}{dt} = - \frac{\beta SI}{N} $$
+
+$$ \frac{dI}{dt} = \frac{\beta SI}{N} - \gamma I - \alpha I $$
+
+$$ \frac{dR}{dt} = \gamma I  $$
+
+where:
+
+-   $\mu$ is the per capita birth and natural death rate (assumed to be equal to maintain a constant total population size),
+-   $\beta$ is the transmission coefficient, representing the rate at which susceptible individuals become infected,
+-   $\gamma$ is the recovery rate, representing the rate at which infected individuals recover,
+-   $N = S + I + R$ is the total population size.
+-   The transmission is frequency-dependent.
+:::
+
+# Implementing the Modified SIR Model to Include Infection-Induced Deaths in R
+
+To implement this model, we will once again use the same generic example as before.
+
+## Step 1: Defining Initial Conditions and Parameters
+
+Let's start by setting our initial conditions, similarly as we did in our previous example:
+
+```{r}
+# Define initial conditions
+initial_state <- c(S = 99, I = 1, R = 0)
+
+# Parameters for the model
+parameters <- c(beta = 0.003,  # Transmission rate
+                gamma = 0.1, # Recovery rate
+                alpha = 0.02) # Infection-induced death rate
+
+# Time points
+times <- seq(0, 400, by = 1)
+```
+
+## Step 2: Writing the SIR Model Function with Infection-Induced Deaths
+
+The next step is to define the SIR model function that incorporates only infection-induced deaths:
+
+```{r}
+sir_model_infection_deaths <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    
+    # Rate of change without birth/natural death rates
+    dS <- -beta * S * I
+    dI <- beta * S * I - gamma * I - alpha * I
+    dR <- gamma * I
+    
+    # Return the rate of change
+    list(c(dS, dI, dR))
+  })
+}
+```
+
+## Step 3: Solving the Differential Equations
+
+We solve the differential equations using the `ode` function from the {deSolve} package.
+
+```{r}
+# Solve the modified SIR model with only infection-induced deaths
+sir_infection_deaths_out <- ode(
+  y = initial_state,
+  times = times,
+  func = sir_model_infection_deaths, 
+  parms = parameters
+)
+```
+
+## Step 4: Converting the Output to a Data Frame and Visualizing
+
+We convert the output to a data frame and visualize it using `ggplot2`:
+
+```{r}
+# Convert the output to a data frame
+sir_infection_deaths_out <- as.data.frame(sir_infection_deaths_out)
+
+# Plot the results
+ggplot(sir_infection_deaths_out, aes(x = time)) +
+  geom_line(aes(y = S, color = "Susceptible")) +
+  geom_line(aes(y = I, color = "Infectious")) +
+  geom_line(aes(y = R, color = "Recovered")) +
+  labs(title = "SIR Model with Infection-Induced Deaths", 
+       x = "Time (days)", y = "Proportion of Population") +
+  scale_color_manual(values = c("Susceptible" = "#2F5597", "Infectious" = "#C00000", "Recovered" = "#548235")) +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+```
+
+## Interpretation and Implications
+
+In this model, you will notice several key differences:
+
+-   **Higher "Removal" Rate**: The combined removal rate in this model is $(\gamma + \alpha)$, which includes both recoveries and infection-induced deaths. This means individuals are removed from the infected pool faster than in a model with only recoveries ($\gamma$).
+-   **Slower Spread of the Disease**: Since individuals are removed from the infected pool faster, the overall number of infections over time decreases, resulting in a smaller peak in the infected population.
+-   **Lower Infection Peak**: With the increased removal rate, fewer individuals remain infectious at any given time, leading to a lower peak of infections.
+-   **Quicker Decline in Infected Population**: As the infected population is removed (either through recovery or death), the number of infectious individuals declines more rapidly.
+
+From a model perspective, it doesn't matter whether an individual recovers or dies: they are both considered removed from the transmission chain. Therefore, "R" in this context can be thought of as "removed" instead of solely "recovered." This is especially true in a density-dependent transmission model, where the transmission depends only on $S$ and $I$. In contrast, in a frequency-dependent model, transmission would also depend on the total population $N$, making the dynamics more complex.
+
+::: practice
+**Exercise 2**
+
+Modify the SIR model with demographics to create an **SI model** that only includes **Susceptible (S)** and **Infected (I)** compartments. The model should incorporate **infection-induced deaths** (i.e., include the infection-induced rate $\alpha$) with a **frequency-dependent transmission**. Use the following parameters and the conceptual diagram below:
+
+-   Initial population: 1000 (with 990 susceptible and 10 infected)
+-   Transmission rate ($\beta$): 0.1
+-   Infection-induced death rate ($\alpha$): 0.02
+
+![](images/si_model_alpha.png){width="262"}
+
+**Tasks:**
+
+1.  Define the initial conditions and parameters for the SI model in R.
+2.  Write an R function to represent the SI model with infection-induced deaths and frequency-dependent transmission.
+3.  Solve the model over 200 days and plot the results using `ggplot2`.
+:::
+
+# SIR Model Simulation
+
+Now that you are familiar with the concepts of demographics, let's explore how these elaborations to the SIR model impact the spread and dynamic of a disease!
+
+The simulation below allows you to explore how changes in the parameters $\beta$, $\gamma$, $\mu$, and $\alpha$ affect the dynamics of the SIR model. Adjust the values to see how the susceptible (S), infected (I), and recovered (R) populations change over time.
+
+To view the live version of the simulation, click [here](https://e2n3nv-graph0courses-team.shinyapps.io/sir_simulator/)!
+
+```{r echo=FALSE}
+
+knitr::include_app("https://e2n3nv-graph0courses-team.shinyapps.io/sir_simulator/",
+                   height = "600px")
+```
+
+::: practice
+**Exercise 3**
+
+Using the SIR model simulator, investigate how different values of $\alpha$ (infection-induced death rate) impact the disease dynamics. Use the following parameters:
+
+-   Initial population: 100 (with 99 susceptible, 1 infected, and 0 recovered)
+-   Transmission rate ($\beta$): 0.1
+-   Recovery rate ($\gamma$): 0.014
+-   Birth/death rate ($\mu$): 0.01
+-   Infection-Induced death rate ($\alpha$): 0.01
+-   Transmission Type: Frequency Dependent
+
+Vary $\alpha$ from 0.01 to 0.05 in increments of 0.01.
+:::
+
+## Understanding the Impact of Demographics
+
+Let’s explore how the vital dynamic parameters ($\mu$ and $\alpha$) influence the spread of a disease using a practical example and using the SIR Model Simulation.
+
+Assume the following initial settings for our population of 100 individuals over the course of 1 year:
+
+-   Transmission rate: $\beta = 0.003$
+-   Recovery rate: $\gamma = 0.1$
+-   Natural birth/death rate: $\mu = 0$
+-   Infection-induced death rate: $\alpha = 0$
+
+![](images/sir_simulation_default.png){width="358"}
+
+This graph shows the classic SIR (Susceptible-Infected-Recovered) model with no demographics (no births or deaths). At the start:
+
+-   The susceptible population (S) starts at 99 and decreases over time as individuals become infected.
+-   The infected population (I) begins with 1 individual and increases to a peak before declining as people either recover or move out of the infected category.
+-   The recovered population (R) starts at 0 and gradually increases as infected individuals recover.
+
+Since there are no births, natural deaths, or infection-induced deaths, the total population (N) remains constant, and the dynamics only depend on transmission and recovery rates.
+
+### Varying $\mu$
+
+Let's explore how incorporating demographic processes impacts epidemic predictions by examining different values of $\mu$.
+
+For this, let's set $\mu$ to different values starting with $\mu = 0.001$, then $\mu = 0.01$, and finally $\mu = 0.1$:
+
+![](images/varying_mu_sir_model.png)
+
+When $\mu$ is low, the infection spreads so rapidly through the population that only a minimal number of births and deaths occur within that period.
+
+As $\mu$ increases (e.g., $\mu$ = 0.01), the timescale of infection begins to be influenced by births, leading to endemic infection. When $\mu$ reaches 0.1, the infection's progression is slower than the rate of births and deaths, preventing the infection from spreading after the initial case is introduced.
+
+If the infection spreads faster than the timescale of births and deaths, demographic processes have little impact on infection dynamics. However, if the infection spreads more slowly, these demographic processes can affect the extent of endemic infection and whether the infection establishes itself at all.
+
+### Varying Demographics and Infection-Induced Deaths
+
+We have previously seen how $\mu$ and $\alpha$ individually affect the SIR model; however, we have not explored their effect when both are introduced. Let's now see what happens in that case!
+
+For this, let's set $\mu = 0.02$ and $\alpha = 0.02$.
+
+![](images/sir_simulation_mu_alpha.png){width="426"}
+
+In this combined scenario:
+
+-   **Births and Deaths Create a Dynamic Equilibrium**: The natural birth/death rate ($\mu = 0.02$) continues to replenish the susceptible population, ensuring the disease doesn't disappear entirely.
+-   **Infection-Induced Deaths Lower the Peak and Stabilize Infections**: The infection-induced death rate ($\alpha = 0.02$) prevents the infected population from growing too large, leading to a lower peak and steady decline in the infected individuals over time.
+
+Overall, this model balances the effects of both demographics and infection-induced deaths, showing a sustained yet lower-level presence of the disease over time. The system reaches a steady state where births maintain the population, while infection-induced deaths prevent uncontrolled outbreaks.
+
+::: challenge
+**Exercise 4**
+
+Write an R function called `sir_model_fd` that represents a **frequency-dependent SIR model** that includes natural births/deaths and infection-induced deaths. Use the SIR conceptual diagram below as a reference.
+
+![](images/sir_model_mu_alpha.png){width="488"}
+:::
+
+::: practice
+**Exercise 5**
+
+Using the SIR model with infection-induced deaths, calculate the total percentage of the population that will die due to the infection over the duration of the simulation. Assume the following parameters and initial conditions:
+
+-   **Initial population (N)**: 1000 (with 990 susceptible, 10 infected, 0 recovered)
+-   **Transmission rate (**$\beta$): 0.1
+-   **Recovery rate (**$\gamma$): 0.05
+-   **Infection-induced death rate (**$\alpha$): 0.02
+-   **Time span**: 200 days
+
+**Tasks:**
+
+1.  Implement the SIR model function in R that includes infection-induced deaths.
+2.  Solve the model over the specified time span.
+3.  Calculate the total number and percentage of deaths due to the infection.
+
+**Hint:** The cumulative number of deaths can be approximated by integrating the infection-induced death rate ($\alpha I$) over time.
+:::
+
+# Conclusion
+
+In this lesson, we first extended the classic SIR model to include demographics, accounting for natural births and deaths. We then introduced infection-induced deaths to further refine the model, providing a more realistic view of disease impact. These modifications help us understand the complex interplay between natural population dynamics, infection-specific mortality and the spread of disease in a population.
+
+By implementing these models in R, we gained practical insights into modeling disease dynamics and the importance of considering different mortality factors.
+
+# Answer Key {.unnumbered}
+
+::: answer
+**Exercise 1**
+
+**Defining Initial Conditions and Parameters**
+
+```{r}
+# Initial conditions
+initial_state <- c(S = 990, E = 5, I = 4, R = 1)
+
+# Define parameters
+parameters <- c(beta = 0.002, # Transmission rate
+                sigma = 0.1,  # Progression rate
+                gamma = 0.05, # Recovery rate
+                mu = 0.01)    # Birth/Death rate
+```
+
+**SEIR Model Function with Births/Deaths (**$\mu$)
+
+```{r}
+# Define the SEIR model function with birth/death rate (mu)
+seir_model_vital <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    
+    # Total population
+    N <- S + E + I + R
+    
+    # Rate of change
+    dS <- mu * N - beta * S * I - mu * S
+    dE <- beta * S * I  - sigma * E - mu * E
+    dI <- sigma * E - gamma * I - mu * I
+    dR <- gamma * I - mu * R
+    
+    # Return the rate of change
+    list(c(dS, dE, dI, dR))
+  })
+}
+```
+
+**Solving the SEIR Model**
+
+```{r}
+# Time span for the simulation
+times <- seq(0, 200, by = 1)
+
+# Solve the SEIR model
+seir_vital_out <- ode(
+  y = initial_state,
+  times = times,
+  func = seir_model_vital, 
+  parms = parameters
+)
+
+# Convert to a data frame
+seir_vital_out <- as.data.frame(seir_vital_out)
+
+# Plot the results
+library(ggplot2)
+ggplot(seir_vital_out, aes(x = time)) +
+  geom_line(aes(y = S, color = "Susceptible")) +
+  geom_line(aes(y = E, color = "Exposed")) +
+  geom_line(aes(y = I, color = "Infected")) +
+  geom_line(aes(y = R, color = "Recovered")) +
+  labs(title = "SEIR Model with Natural Births and Deaths", x = "Time (days)", y = "Population Count") +
+  scale_color_manual(values = c("Susceptible" = "blue", "Exposed" = "orange", "Infected" = "red", "Recovered" = "green")) +
+  theme_minimal()
+```
+:::
+
+::: answer
+**Exercise 2**
+
+**Step 1: Defining Initial Conditions and Parameters**
+
+```{r}
+# Define initial conditions
+initial_state <- c(S = 990, I = 10)
+
+# Define parameters
+parameters <- c(beta = 0.1, # Transmission rate
+                alpha = 0.02)    # Infection-induced rate
+```
+
+**Step 2: Writing the SI Model Function with Births/Deaths and Frequency-Dependent Transmission**
+
+```{r}
+# Define the SI model function with natural births/deaths and frequency-dependent transmission
+si_model_freq <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    
+    # Total population
+    N <- S + I
+    
+    # Rate of change
+    dS <- - (beta * S * I / N) 
+    dI <- (beta * S * I / N) - alpha * I
+    
+    # Return the rate of change
+    list(c(dS, dI))
+  })
+}
+```
+
+**Step 3: Solving the Model Using the `ode` Function**
+
+```{r}
+# Load the deSolve package
+if(!require(deSolve)) install.packages("deSolve")
+library(deSolve)
+
+# Time span for the simulation
+times <- seq(0, 400, by = 1)
+
+# Solve the SI model
+si_freq_out <- ode(
+  y = initial_state,
+  times = times,
+  func = si_model_freq, 
+  parms = parameters
+)
+
+# Convert the output to a data frame
+si_freq_out <- as.data.frame(si_freq_out)
+```
+
+**Step 4: Plotting the Results Using `ggplot2`**
+
+```{r}
+# Load the ggplot2 package
+if(!require(ggplot2)) install.packages("ggplot2")
+library(ggplot2)
+
+# Plot the results
+ggplot(si_freq_out, aes(x = time)) +
+  geom_line(aes(y = S, color = "Susceptible")) +
+  geom_line(aes(y = I, color = "Infected")) +
+  labs(title = "SI Model with Births/Deaths and Frequency-Dependent Transmission", 
+       x = "Time (days)", y = "Population Count") +
+  scale_color_manual(values = c("Susceptible" = "blue", "Infected" = "red")) +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+```
+:::
+
+::: answer
+**Exercise 3**
+
+Overall Impact of Varying $\alpha$ on Disease Dynamics:
+
+-   Higher $\alpha$ Values: Increase the rate at which infected individuals die, thereby reducing the infection's ability to spread. This results in a shorter outbreak with a lower peak of infected individuals and fewer recovered individuals.
+
+-   Lower $\alpha$ Values: Allow the disease to spread more extensively, leading to a higher peak of infected individuals and a prolonged epidemic duration.
+:::
+
+::: answer
+**Exercise 4**
+
+```{r}
+# Define the SIR model function for Frequency Dependent (FD)
+sir_model_fd <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    
+    # Calculate total population size
+    N <- S + I + R
+    
+    # Rate of change with frequency-dependent transmission
+    dS <- mu * N - beta * S * I / N - mu * S
+    dI <- beta * S * I / N - gamma * I - (mu + alpha) * I
+    dR <- gamma * I - mu * R
+    
+    # Return the rate of change
+    list(c(dS, dI, dR))
+  })
+}
+```
+:::
+
+::: answer
+**Exercise 5**
+
+**Step 1: Defining the SIR Model Function with Infection-Induced Deaths**
+
+```{r}
+# SIR model with infection-induced deaths
+sir_model_infection_deaths <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    
+    # Rate of change
+    dS <- -beta * S * I / N
+    dI <- beta * S * I / N - gamma * I - alpha * I
+    dR <- gamma * I
+    
+    # Return the rate of change
+    list(c(dS, dI, dR), deaths = alpha * I)
+  })
+}
+```
+
+**Step 2: Initializing Conditions and Parameters**
+
+```{r}
+# Initial conditions
+initial_state <- c(S = 990, I = 10, R = 0)
+
+# Parameters for the model
+parameters <- c(beta = 0.1, gamma = 0.05, alpha = 0.02)
+
+# Time span
+times <- seq(0, 200, by = 1)
+```
+
+**Step 3: Solving the Model**
+
+```{r}
+# Load the deSolve package
+if(!require(deSolve)) install.packages("deSolve")
+library(deSolve)
+
+# Solve the model
+sir_out <- ode(
+  y = initial_state,
+  times = times,
+  func = sir_model_infection_deaths,
+  parms = parameters
+)
+
+# Convert to data frame
+sir_out <- as.data.frame(sir_out)
+```
+
+**Step 4: Calculating Total Deaths**
+
+```{r}
+# Calculate cumulative deaths over time
+sir_out$cumulative_deaths <- cumsum(sir_out$deaths)
+
+# Final number of deaths
+total_deaths <- max(sir_out$cumulative_deaths)
+
+# Calculate the percentage of deaths relative to the initial population
+percentage_deaths <- (total_deaths / 1000) * 100
+
+# Print results
+cat("Total number of deaths due to infection:", round(total_deaths), "\n")
+cat("Percentage of the population that died due to infection:", round(percentage_deaths, 2), "%\n")
+```
+
+**Expected Output:**
+
+-   Total number of deaths due to infection: approximately 50-100 (varies based on model dynamics).
+-   Percentage of the population that died due to infection: approximately 5-10%.
+:::
+
+# Contributors {.unlisted .unnumbered}
+
+The following team members contributed to this lesson:
+
+`r .tgc_contributors_list(ids = c("sabina", "joy"))`
+
+## References {.unlisted .unnumbered}
+
+-   Keeling, M. J., & Rohani, P. (2008). *Modeling Infectious Diseases in Humans and Animals*. Princeton University Press.
+-   Soetaert, K., Woodrow Setzer, R., & Petzoldt, T. (2021). *R package deSolve*. <https://desolve.r-forge.r-project.org/>
+-   World Health Organization. *World Malaria Report 2023.* Geneva: World Health Organization, 2023. Accessed November 13, 2024. <https://www.who.int/teams/global-malaria-programme/reports/world-malaria-report-2023>.
+-   Centers for Disease Control and Prevention. "Weekly U.S. Influenza Surveillance Report." Last modified November 10, 2024. Accessed November 13, 2024. <https://www.cdc.gov/fluview/surveillance/2024-week-44.html>.
+
+`r .tgc_license()`

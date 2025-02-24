@@ -1,0 +1,491 @@
+---
+title: 'Lesson 3 | SIR Modelling in R'
+output:
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+    css: !expr here::here("global/style/style.css")
+    highlight: kate
+editor_options:
+  markdown:
+    wrap: 100
+  canonical: true
+  chunk_output_type: inline
+---
+
+```{r, echo = F, message = F, warning = F}
+# Load packages 
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load(rlang, tidyverse, knitr, here, reactable, gt, flextable)
+
+# Source functions 
+source(here("global/functions/lesson_functions.R"))
+
+# Knitr options
+knitr::opts_chunk$set(warning = F, message = F, class.source = "tgc-code-block", error = T)
+```
+
+------------------------------------------------------------------------
+
+# Introduction {.unnumbered}
+
+Programming tools like R are very helpful for handling complex math problems, especially in mathematical modeling. For example, they make it easier to build and use models like the SIR model we studied before.
+
+Today, you will learn how to create and graph a SIR model in R.
+
+Let's get started!
+
+# Learning objectives {.unnumbered}
+
+By the end of this lesson, you should be able to:
+
+-   Define initial conditions and parameters for the SIR (Susceptible, Infected, Recovered) model.
+-   Write a function in R to represent the SIR model's differential equations.
+-   Solve the SIR model's differential equations using the {deSolve} package.
+-   Convert the output of the differential equations into a data frame for further analysis.
+-   Visualize the results of the SIR model using the ggplot2 package in R.
+
+# Packages {.unnumbered}
+
+This lesson will require the following packages to be installed and loaded:
+
+```{r warning = F, message = F, echo = T}
+# Load packages 
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load(deSolve, # package to solve differential equations
+               tidyverse, # package that includes ggplot2
+               here)
+```
+
+# R-Based Code Along
+
+Let's translate the theoretical concepts and differential equations we learned in the previous lesson and put them into practice by implementing a SIR model in R.
+
+## Setting Up the SIR Model in R
+
+In order to set-up a compartmental model in R such as the SIR model, the following steps need to be completed:
+
+-   **Step 1**: Setting up Initial Conditions and Parameters
+-   **Step 2**: Writing the SIR Model Function
+-   **Step 3**: Solving the Differential Equations
+-   **Step 4**: Converting the Output to a Data Frame
+
+### Step 1: Setting Initial Conditions and Parameters
+
+The first step of creating a SIR model in R is defining the initial conditions and parameters of the model.
+
+::: recap
+As a reminder, the compartments and parameters of the SIR model are the following:
+
+-   **Susceptible (S)**: Number of individuals who can become infected (total population at risk).
+-   **Infected (I)**: Number of individuals who are infected and can transmit the disease.
+-   **Recovered (R)**: Number of individuals who have recovered and are no longer infectious.
+-   **Transmission coefficient (β)**: The rate at which susceptible individuals become infected.
+-   **Recovery rate (γ)**: The rate at which infected individuals recover.
+
+![](images/sir_model_intro.png){width="408"}
+:::
+
+Let's use the boarding school influenza epidemic in Northern England as an example and review the epidemiological summary to figure out the initial conditions and parameters that will need to use to create our SIR model.
+
+::: key-point
+**Epidemiological Summary of the Boarding School Influenza Outbreak**
+
+In January, an influenza epidemic occurred at a boarding school in northern England, affecting **763** boys aged 10 to 18. The first case presented with illness from January 15 to 18. By January 22, three boys were in the infirmary, and the outbreak escalated rapidly.
+
+The average illness duration was **three to seven days**, with most boys returning to class within five to six days. The virus peaked within seven days and subsided after **13 days**. Despite prior vaccination, the outbreak was rapid, likely due to an antigenic shift.
+
+Only one adult developed symptoms. Complications were rare, with a few cases of secondary bacterial infections responding well to antibiotics.
+:::
+
+Let's try to identify the number of individuals for the initial conditions (Susceptible, Infected, Recovered).
+
+Based on the epidemiological summary, the total population at risk is 763 boys. Initially, one boy is infected, known as "patient zero," setting the number of infected individuals (I) to 1. The remaining 762 boys are susceptible (S), calculated by subtracting the infected boy from the total population (763 - 1). At the start, no individuals have recovered, so the initial number of recovered (R) is 0.
+
+This setup accurately represents the population's initial state as the outbreak begins.
+
+Therefore the initial conditions are:
+
+-   **Total population:** 763 boys.
+-   **Initial infected (I):** 1 boy (patient zero).
+-   **Initial susceptible (S):** 762 boys (763 total - 1 infected).
+-   **Initial recovered (R):** 0 (none recovered at the start).
+
+Based on this information we can set our initial conditions to:
+
+$$ S = 762 $$
+
+$$ I = 1 $$
+
+$$ R = 0 $$
+
+Now that we know our initial conditions, let's go ahead and create a vector in R called `initial_state` that contains the value of our initial conditions for S, I and R:
+
+```{r}
+# Define the initial conditions
+initial_state <- c(S = 762, I = 1, R = 0)
+
+initial_state
+```
+
+We are now going to define the value of the two parameters of the SIR model - the transmission coefficient (beta) and the recovery rate (gamma).
+
+::: side-note
+**Deriving Transmission and Recovery Rate**
+
+For today's lesson we will provide you with the values we are going to use, but in a later lesson we will discuss how to calculate and derive these values according to epidemiological data.
+:::
+
+Let's create a vector called `parameters` containing the value of the transmission rate `beta` and the value of the recovery rate `gamma`:
+
+```{r}
+#Define the parameters
+parameters <- c(beta = 0.0026, # Transmission rate
+                gamma = 0.5)   # Recovery rate
+
+parameters
+```
+
+Finally, we will need to set the time span for which we want our simulation to run for. According to the influenza outbreak summary, the influenza virus spread quickly, **reaching its peak within seven days and subsiding after 13 days**. For this, we will make the duration of the simulation 2 weeks (14 days).
+
+Let's create a numerical vector that will include the 14 days:
+
+```{r}
+# Time span for the simulation
+times <- seq(1, 14, by = 1)
+```
+
+::: practice
+**Exercise 1**
+
+Define the initial conditions and parameters for an SEIR model where the total population is 1000, the initial exposed population is 5, the initial infected population is 0, and the initial recovered population is 0. The transmission rate (β) is 0.003, the incubation rate (σ) is 0.2, and the recovery rate (γ) is 0.1. Create the vectors for these initial conditions and parameters in R.
+:::
+
+### Step 2: Writing the SIR Model Function
+
+Now that we've set up our initial conditions and parameters, we'll implement the SIR model using the {deSolve} package in R.
+
+To do this, we need to start by writing a function that describes the SIR model.
+
+We'll define a function called `sir_model` that takes three arguments: `time`, `state`, and `parameters`. The `time` argument represents the time points for which we want to solve the model. The `state` argument is a vector containing the initial values of the compartments (S, I, R), and `parameters` is a vector containing the model parameters (β and γ).
+
+Here is the structure of the function:
+
+```{r}
+sir_model <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    # Rate of change
+    dS <- -beta * S * I
+    dI <- beta * S * I - gamma * I
+    dR <- gamma * I
+    
+    # Return the rate of change
+    list(c(dS, dI, dR))
+  })   # end with (as.list...) 
+}
+```
+
+Let's break down the function and better understand what each section does:
+
+![](images/sir_model_code_breakdown.png) **Function Definition:**
+
+We start by defining the function `sir_model` which will model our system of differential equations.
+
+This function takes three arguments:
+
+-   `time`: Representing the time points
+
+-   `state`: Vector containing the current values of the compartments (S, I, R)
+
+-   `parameters`: Vector containing the model parameters (β and γ).
+
+```{r eval = F}
+# Define function and arguments
+sir_model <- function(time, state, parameters) {
+  
+}  
+```
+
+**Combining Inputs into a List:**
+
+Within the function, we use the `with` function in combination with `as.list` to merge the `state` and `parameters` into a single list.
+
+This step allows us to access the elements of `state` and `parameters` directly by their names, simplifying the subsequent calculations.
+
+```{r eval = F}
+  with(as.list(c(state, parameters)), {
+    
+  })
+```
+
+**Calculating Rates of Change:**
+
+Next, we calculate the rate of change for each compartment using the model equations.
+
+::: recap
+**The Ordinary Differential Equations of the SIR Model**
+
+The SIR model is governed by the **three** following differential equations.
+
+$$
+\frac{dS}{dt} = - \beta SI 
+$$ $$
+\frac{dI}{dt} = \beta SI - \gamma I 
+$$ $$
+\frac{dR}{dt} = \gamma I $$
+
+Where: $\beta$ is the transmission rate, and $\gamma$ is the recovery rate.
+:::
+
+We will need to use the **ordinary differential equations** for the **SIR model** that we learned from Lesson 2, where:
+
+-   `dS` calculates the rate of change of the susceptible population. It is given by `-beta * S * I`, reflecting the decrease in susceptible individuals as they become infected. $$
+        {dS} = - \beta SI 
+        $$
+-   `dI` calculates the rate of change of the infected population. It is determined by `beta * S * I - gamma * I`, representing the increase due to new infections and the decrease due to recovery. $$
+        {dI} = \beta SI - \gamma I 
+        $$
+-   `dR` calculates the rate of change of the recovered population. It is given by `gamma * I`, indicating the rate at which infected individuals recover. $$
+        {dR} = \gamma I 
+        $$
+
+Written in our function as follows:
+
+```{r eval = F}
+    dS <- -beta * S * I
+    dI <- beta * S * I - gamma * I
+    dR <- gamma * I
+```
+
+**Returning the Rates of Change:**
+
+Finally, we return the rates of change as a list. This list contains the computed values of `dS`, `dI`, and `dR`, which represent the rates at which the compartments change over time.
+
+```{r eval = F}
+  # Return the rate of change
+  list(c(dS, dI, dR))
+```
+
+::: practice
+**Exercise 2**
+
+Write an R function called `seir_model` that represents the differential equations for the SEIR model. Use the structure of the SIR model function provided in the lesson and the SEIR conceptual diagram below as a reference.
+
+![](images/seir_model_intro.png){width="300"}
+:::
+
+### Step 3: Solving the Differential Equations
+
+In order to solve the differential equations of our SIR model, we will use the `ode` function from the {deSolve} package.
+
+::: side-note
+**Understanding the {deSolve} Package**
+
+The {deSolve} package in R is a powerful tool for numerically solving differential equations. It provides functions to solve initial value problems for systems of ordinary differential equations (ODEs), partial differential equations (PDEs), differential algebraic equations (DAEs), and delay differential equations (DDEs). The versatility of {deSolve} makes it suitable for a wide range of applications, including those derived from converting PDEs to ODEs through numerical differencing.
+
+For more details on the {deSolve} package, please refer to the [deSolve package documentation](https://desolve.r-forge.r-project.org/).
+:::
+
+We can use the `ode()` function from the {deSolve} package to solve the ordinary differential equations.
+
+The function `ode()` requires **4 arguments**:
+
+-   `y` represents the initial state of the compartments (S, I, R).
+-   `times` is the sequence of time points over which we want to solve the equations.
+-   `func` is the model function `sir_model` that defines the rate of change for each compartment.
+-   `parms` is the vector of parameters (β and γ) used in the model.
+
+```{r}
+sir_out <- ode(
+  # inital state
+  y = initial_state,
+  # sequence of time points
+  times = times,
+  # model function
+  func = sir_model, 
+  # parameters in the model
+  parms = parameters
+  )
+```
+
+::: practice
+**Exercise 3**
+
+Use the `ode` function from the {deSolve} package to solve the differential equations for the initial conditions and parameters defined in Exercise 1. Set the time span for the simulation to 50 days.
+:::
+
+### Step 4: Converting the Output to a Data Frame
+
+Finally, we convert the output to a data frame for easier manipulation and visualization:
+
+```{r render = .reactable_5_rows}
+sir_out <- as.data.frame(sir_out)
+
+sir_out
+```
+
+## Visualizing the Results
+
+To visualize the dynamics of the SIR model, we will create a plot using the ggplot2 package where we will graph all three predicted lines (S, I, R):
+
+```{r}
+# Create a plot to visualize the dynamics of the SIR model
+ggplot(sir_out, aes(x = time)) +
+  # Graph Susceptible line
+  geom_line(aes(y = S, color = "Susceptible")) +
+  # Graph Infected line
+  geom_line(aes(y = I, color = "Infectious")) +
+  # Graph Recovered line
+  geom_line(aes(y = R, color = "Recovered")) +
+  # Add title and labels
+  labs(title = "SIR Model Simulation", x = "Time (days)", y = "Population Count") +
+  # Specify color for each line
+  scale_color_manual(values = c("Susceptible" = "#2F5597", "Infectious" = "#C00000", "Recovered" = "#548235")) +
+  # Select theme
+  theme_minimal()
+```
+
+::: practice
+**Exercise 4**
+
+Visualize the results of the SEIR model solution from Exercise 3 using ggplot2. Plot the number of susceptible, exposed, infected, and recovered individuals over time on the same graph with different colors for each compartment.
+:::
+
+# Comparing Observed vs. Simulated Epidemic Curves
+
+With our simulated epidemic curve for the 1978 influenza outbreak example, we can now compare it to the actual observed data. This comparison will help us understand how well the simulation captures the dynamics of the outbreak.
+
+## Step 1: Load and Explore the Observed Data
+
+First, let's load the dataset containing the observed total number of influenza cases per day in the boarding school example:
+
+```{r message=F, render=.reactable_10_rows}
+# Load observed data
+observed_data <- read_csv(here("data/influenza_boarding_school.csv"))
+
+observed_data
+```
+
+The dataset `observed_data` contains three columns:
+
+-   `day`: The number of days since the outbreak began (starting from day 0).
+-   `cases`: The total number of influenza cases present on each day.
+-   `date`: The actual date corresponding to each day in the dataset.
+
+## Step 2: Create a Comparison Graph
+
+Next, we'll create a simple graph that overlays the observed epidemic curve with the simulated curve. This will allow us to visually compare the real outbreak data against our model's predictions:
+
+```{r}
+comparison_graph <- 
+  ggplot() +
+  # Plot observed epidemic curve as black line with points
+  geom_line(data = observed_data, aes(x = day, y = cases), 
+            color = "black") +
+  geom_point(data = observed_data, aes(x = day, y = cases), 
+             color = "black") +
+    # Plot simulated epidemic curve (infected compartment) as red line
+  geom_line(data = sir_out, aes(x = time, y = I), 
+            color = "red") +
+  theme_bw()
+
+# Display the comparison graph
+comparison_graph
+```
+
+As seen above, the graph displays two curves: the black line represents the observed epidemic curve and the red line shows the simulated epidemic curve. By comparing these, we can assess how closely the simulation aligns with the real-world outbreak data. The close alignment of the two curves indicates that the simulated SIR model provides a good approximation of the real-world data.
+
+# Conclusion
+
+In this lesson, we translated theoretical concepts into practice by implementing the SIR model in R. We covered setting up initial conditions and parameters, writing the SIR model function, solving the differential equations using the `deSolve` package, and converting the output into a data frame. Finally, we visualized the results using `ggplot2`, customizing the plots for clear communication of the model's dynamics. This hands-on approach provided essential skills for modeling and visualizing epidemiological data in R.
+
+# Answer Key {.unnumbered}
+
+::: answer
+**Exercise 1**
+
+```{r}
+# Define the initial conditions
+initial_state <- c(S = 995, E = 5, I = 0, R = 0)
+
+# Define the parameters
+parameters <- c(beta = 0.003, # Transmission rate
+                sigma = 0.2,  # Incubation rate
+                gamma = 0.1)  # Recovery rate
+```
+:::
+
+::: answer
+**Exercise 2**
+
+```{r}
+# Define the SEIR model function
+seir_model <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    # Rate of change
+    dS <- -beta * S * I
+    dE <- beta * S * I - sigma * E
+    dI <- sigma * E - gamma * I
+    dR <- gamma * I
+    
+    # Return the rate of change
+    list(c(dS, dE, dI, dR))
+  }) # end with (as.list...)
+}
+```
+:::
+
+::: answer
+**Exercise 3**
+
+```{r render = .reactable_5_rows}
+# Load the deSolve package
+if(!require(deSolve)) install.packages("deSolve")
+library(deSolve)
+
+# Time span for the simulation
+times <- seq(1, 50, by = 1)
+
+# Solve the SEIR model
+seir_out <- ode(
+  y = initial_state,
+  times = times,
+  func = seir_model, 
+  parms = parameters
+)
+
+# Convert the output to a data frame
+seir_out <- as.data.frame(seir_out)
+```
+:::
+
+::: answer
+**Exercise 4**
+
+```{r}
+# Plot the results
+ggplot(seir_out, aes(x = time)) +
+  geom_line(aes(y = S, color = "Susceptible")) +
+  geom_line(aes(y = E, color = "Exposed")) +
+  geom_line(aes(y = I, color = "Infected")) +
+  geom_line(aes(y = R, color = "Recovered")) +
+  labs(title = "SEIR Model Simulation", x = "Time (days)", y = "Population Count") +
+  scale_color_manual(values = c("Susceptible" = "#2F5597", "Exposed" = "#FFD700", "Infected" = "#C00000", "Recovered" = "#548235")) +
+  theme_minimal()
+```
+:::
+
+# Contributors {.unlisted .unnumbered}
+
+The following team members contributed to this lesson:
+
+`r .tgc_contributors_list(ids = c("sabina", "joy"))`
+
+## References {.unlisted .unnumbered}
+
+-   NEWS AND NOTES." 1978. *British Medical Journal* 1, no. 6112: 586–590.
+-   Drake Lab. "SISMID 2019: Mathematical Models of Infectious Diseases." Odum School of Ecology, University of Georgia. Accessed August 21, 2024. <https://daphnia.ecology.uga.edu/drakelab/?page_id=2370>.
+-   Soetaert, K., Woodrow Setzer, R., & Petzoldt, T. (2021). *R package deSolve*. <https://desolve.r-forge.r-project.org/>
+
+`r .tgc_license()`

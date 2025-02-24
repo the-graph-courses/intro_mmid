@@ -1,0 +1,740 @@
+---
+title: 'Lesson 6 | Introduction to SEIR Model and Hepatitis E Virus'
+output:
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+    css: !expr here::here("global/style/style.css")
+    highlight: kate
+editor_options:
+  markdown:
+    wrap: 100
+  canonical: true
+  chunk_output_type: inline
+---
+
+```{r, echo = F, message = F, warning = F}
+# Load packages
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load(rlang, tidyverse, knitr, here, reactable, gt, flextable)
+
+# Source functions
+source(here("global/functions/lesson_functions.R"))
+
+# Knitr options
+knitr::opts_chunk$set(warning = F, message = F, class.source = "tgc-code-block", error = T)
+```
+
+------------------------------------------------------------------------
+
+# Introduction {.unnumbered}
+
+In this lesson, we will study the SEIR model—a compartmental model widely used extension of the classic SIR model in epidemiology. The SIR model assumes that individuals become immediately infectious after getting infected. The SEIR model adds an *Exposed (E)* compartment, representing individuals who have been infected by the pathogen but are not yet transmitting it to others. By expanding the classic SIR model, we can better understand the dynamics of diseases with an incubation period.
+
+To bring these concepts to life, we’ll apply the SEIR model to Hepatitis E Virus (HEV), a disease with a well-defined incubation period, to study how it spreads in a population.
+
+# Learning Objectives {.unnumbered}
+
+By the end of this lesson, you should be able to:
+
+-   Understand the SEIR model and the role of the *Exposed* compartment.
+-   Recognize the importance of modeling the latent period in diseases.
+-   Implement the SEIR model in R and visualize the results.
+-   Customize the SEIR model for Hepatitis E Virus (HEV) to study its transmission dynamics.
+
+# Packages {.unnumbered}
+
+The following packages are necessary for this lesson:
+
+```{r warning = F, message = F, echo = T}
+if (!require(pacman)) install.packages("pacman")
+pacman::p_load(deSolve, # package to solve differential equations
+               tidyverse, # package that includes ggplot2
+               here)
+```
+
+# Introduction to the SEIR Model
+
+The classic SIR model assumes that individuals become infectious immediately upon exposure. This is a reasonable assumption for diseases such as measles, which we modeled in previous lessons. However, many diseases exhibit a **latent period** — a stage where individuals are infected but not yet capable of spreading the disease. The SEIR model incorporates this latent period by adding an *Exposed (E)* compartment.
+
+## Why Include the Exposed (E) Compartment?
+
+In many infectious diseases, individuals do not become infectious immediately after exposure. Instead, there is a **latent period** during which the pathogen replicates within the host, but the individual is not yet capable of transmitting the disease to others. This latency is an essential feature of diseases like Hepatitis E Virus (HEV), influenza, and measles, where the dynamics of transmission depend heavily on the timing of this incubation period.
+
+Without the *Exposed (E)* compartment, the SIR model assumes that susceptible individuals transition directly to being infectious, which oversimplifies the transmission process.
+
+Let's review the SIR timeline assumption:
+
+![](images/sir_timeline_assumptions.png){width="386"}
+
+In the SIR model, individuals are assumed to transition immediately from susceptible to infectious, where being infectious and being infected are the same and where the symptoms are only present when an individual is infectious. There is an overlap between infectiousness and disease symptoms.
+
+Now let's compare that to the SEIR timeline assumption for a disease with a latent period, using the example of **chickenpox**:
+
+![](images/seir_timeline_assumptions.png){width="502"}
+
+Adding the *Exposed* compartment allows the model to:
+
+-   **Capture the Delay in Infectiousness**: Reflect the time it takes for individuals to become capable of spreading the disease.
+
+-   **Improve Accuracy for Real-World Diseases**: More accurately model the dynamics of diseases with incubation periods, such as HEV, where the mean latent period is approximately 34 days.
+
+-   **Distinguish Between Latent and Infectious Stages**: Allow separate modeling of the biological processes occurring during the latent and infectious stages of disease progression.
+
+In the SEIR model, we add an *Exposed (E)* compartment to account for the **latent period**. This stage is crucial for understanding how diseases actually progress.
+
+::: side-note
+**Understanding Variability Transmission Through Infection Stages**
+
+The SIR and SEIR modelling frameworks we have used assume single categories of latent/exposed infected/infectious (I) and recovered/immune (R) people, a uniform incubation period, fixed rate of recovery, and simple estimates for the duration of infectiousness. Many compartmental models designed to inform policy on malaria, HIV, and TB also use these assumptions. However, these pathogens can exhibit variable infection dynamics in the host, creating extensive variability in the infection length, recovery rate, and level of infectiousness of an individual.
+
+![Grey shaded areas denote periods where the infection is asymptomatic, either due to chronicity in malaria (A) and HIV (B) or latency as in TB (C). Despite a lack of symptoms, particularly during chronic infections, individuals may still be infectious and contribute to spread of the pathogen. Source: Childs et al., 2015.](images/different_diseases_progression.jpg){width="365"}
+
+Diseases progress through different stages of infection, impacting transmission dynamics:
+
+-   **Malaria**: Characterized by **sustained** parasite growth in the host, and **oscillations** in pathogen abundance during a **chronic phase** lasting weeks to months, with peaks driving infectiousness. Control efforts must target these acute phases.
+
+-   **HIV**: Exhibits an initial **acute phase** of high infectiousness, followed by a prolonged **chronic phase** lasting months to years, during which the infectious host may be **asymptomatic**. Early detection and long-term treatment are critical.
+
+-   **Tuberculosis (TB)**: Includes an **asymptomatic latent phase** where individuals are not infectious, followed by a highly transmissible **active phase**. Identifying and treating latent infections prevents progression and spread.
+
+These differences highlight the importance of accounting for **latent periods, chronic stages, and fluctuations in pathogen abundance** when modeling epidemics and designing public health interventions for diseases with more complex within-host dynamics.
+:::
+
+# Modifying the SIR Model into the SEIR Model
+
+The SEIR model expands the classic SIR model by adding an *Exposed (E)* compartment between the *Susceptible (S)* and *Infectious (I)* compartments. This addition accounts for the **latent period**—the time between an individual being exposed to the pathogen and becoming infectious. The inclusion of this compartment makes the model more realistic for diseases that have a significant incubation period.
+
+## Conceptualizing the SEIR Model
+
+Let's try to transform our SIR model into the SEIR model, but first let's review the SIR model!
+
+::: recap
+**The SIR Model**
+
+![](images/sir_model_recap.png){width="416"}
+:::
+
+The SEIR model divides a population into four compartments:
+
+-   **Susceptible (S)**: Individuals who can become infected.
+-   **Exposed (E)**: Individuals who have been exposed to the virus but are not yet infectious.
+-   **Infectious (I)**: Individuals who can transmit the virus to susceptible individuals.
+-   **Recovered (R)**: Individuals who have recovered and are now immune.
+
+And three critical parameters:
+
+-   $\beta$ (Transmission rate): Rate at which susceptible individuals become exposed through contact with infectious individuals.
+-   $\sigma$ (Progression rate): Rate at which exposed individuals progress to being infectious.
+-   $\gamma$ (Recovery rate): Rate at which infectious individuals recover and move to the recovered state.
+
+![](images/seir_model_intro.png){width="594"}
+
+## SEIR Model Equations
+
+The SEIR model is defined mathematically by the following set of differential equations:
+
+-   **Susceptible:** Individuals leave this compartment as they become exposed. $$ \frac{dS}{dt} = -\beta S I $$
+
+-   **Exposed:** Individuals enter this compartment upon exposure and leave as they become infectious. $$ \frac{dE}{dt} = \beta S I - \sigma E $$
+
+-   **Infectious:** Individuals enter this compartment from the exposed state and leave as they recover. $$ \frac{dI}{dt} = \sigma E - \gamma I $$
+
+-   **Recovered:** Individuals enter this compartment as they recover from the disease. $$ \frac{dR}{dt} = \gamma I $$
+
+where:
+
+-   $\beta$ is the transmission coefficient, representing the rate at which susceptible individuals become infected,
+-   $\sigma$ is the progression rate, representing the rate at which exposed individuals progress to being infectious.
+-   $\gamma$ is the recovery rate, representing the rate at which infected individuals recover,
+-   The transmission is **density-dependent**
+
+::: side-note
+**ODEs for Frequency-dependent Transmission**
+
+To mathematically represent the model for a frequency-dependent transmission, we modify the **transmission term** which affects the differential equations for the S and E compartments. Recall that the transmission term we use for the density-dependent model is $\beta SI$ (as above), and for the frequency-dependent model we use $\frac{\beta SI}{N}$ (as below).
+
+$$ \frac{dS}{dt} = \frac{\beta SI}{N}$$
+
+$$ \frac{dE}{dt} = \frac{\beta S I}N - \sigma E $$
+
+$$ \frac{dI}{dt} = \sigma E - \gamma I $$
+
+$$ \frac{dR}{dt} = \gamma I $$
+
+where N is the total population size ($S + E + I + R = N$)
+:::
+
+# Implementing the SEIR Model in R
+
+Let’s implement the SEIR model step by step in R. We’ll simulate the dynamics of an infectious disease over time, starting with basic parameter definitions and solving the model.
+
+For this, we will use a generic theoretical example.
+
+## Step 1: Setting up Initial Conditions and Parameters
+
+We begin by defining the initial conditions and parameters for the model:
+
+-   **Total population (N):** 1000
+-   **Initial susceptible (S):** 990
+-   **Initial exposed (E):** 5
+-   **Initial infected (I):** 4
+-   **Initial recovered (R):** 1
+-   **Transmission rate (β):** 0.002
+-   **Progression rate (σ):** 0.1
+-   **Recovery rate (γ):** 0.05
+-   **Time span:** 200 days
+
+Let's define the parameters, initial conditions, and time span for our model in R:
+
+```{r}
+# Initial conditions
+initial_state <- c(S = 990, E = 5, I = 4, R = 1)
+
+# Parameters
+parameters <- c(beta = 0.002,  # Transmission rate
+                sigma = 0.1,   # Rate of progression from exposed to infectious
+                gamma = 0.05)  # Recovery rate
+
+# Time span for simulation
+times <- seq(0, 200, by = 1)
+```
+
+## Step 2: Writing the SEIR Model Function
+
+Next, we define the SEIR model as a function in R. Our model will be closed and density-dependent:
+
+```{r}
+seir_model <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    
+    # Differential equations
+    dS <- -beta * S * I
+    dE <- beta * S * I - sigma * E
+    dI <- sigma * E - gamma * I
+    dR <- gamma * I
+    
+    # Return list of rates of change
+    list(c(dS, dE, dI, dR))
+  })
+}
+```
+
+## Step 3: Solving the Differential Equations
+
+We then use the `ode()` function from the {deSolve} package to solve this system:
+
+```{r}
+# Solve the SEIR model
+seir_out <- ode(
+  y = initial_state, 
+  times = times, 
+  func = seir_model, 
+  parms = parameters)
+```
+
+## Step 4: Converting the Output to a Data Frame and Visualizing
+
+Finally, we convert the data output as a dataframe and plot the model output to visualize the changes over time in each compartment.
+
+```{r}
+# Convert output to a data frame
+seir_out <- as.data.frame(seir_out)
+
+# Plot the results
+ggplot(seir_out, aes(x = time)) +
+  geom_line(aes(y = S, color = "Susceptible")) +
+  geom_line(aes(y = E, color = "Exposed")) +
+  geom_line(aes(y = I, color = "Infectious")) +
+  geom_line(aes(y = R, color = "Recovered")) +
+  labs(title = "SEIR Model Dynamics", x = "Time (days)", y = "Population Count") +
+  scale_color_manual(values = c("Susceptible" = "#2F5597", "Exposed" = "#ED7D31", "Infectious" = "#C00000", "Recovered" = "#548235")) +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+```
+
+::: practice
+**Question 1**: **Exploring Initial Conditions**
+
+Simulate the SEIR model with the following two scenarios:\
+1. Scenario 1: $S = 990$, $E = 5$, $I = 4$, $R = 0$.\
+2. Scenario 2: $S = 800$, $E = 50$, $I = 150$, $R = 0$.
+
+**Task**:\
+Plot the infectious population ($I$) over time for both scenarios and identify which scenario leads to a faster and larger outbreak.
+:::
+
+# HEV Case Study
+
+## Background on Hepatitis E Virus (HEV)
+
+Hepatitis E Virus (HEV), although still less well known than other hepatitis viruses such as A, B, and C, is a major cause of acute viral hepatitis. It is particularly concerning in resource-limited and emergency settings, such as internally displaced persons (IDP) camps, due to its high transmission potential and severe outcomes in vulnerable populations. HEV primarily spreads via the fecal-oral route, often through feces-contaminated water supplies, making it a critical public health challenge in areas with inadequate sanitation and hygiene.
+
+Viral hepatitis progresses through four phases: **incubation**, **preicteric**, **icteric**, and **convalescence**. The **preicteric phase** brings nonspecific symptoms like fatigue and nausea. The **icteric phase** follows with jaundice, dark urine, and yellowing of the eyes, lasting days to weeks. Recovery occurs in the **convalescence phase**, with symptoms gradually resolving.
+
+### Disease Burden and High-Risk Populations
+
+HEV infection causes large epidemics of liver disease. It is commonly seen in developing countries with restricted access to sanitation, clean water, and poor hygiene. HEV is estimated to cause over 20 million infections annually, predominantly in regions of Asia, Africa, and the Middle East. Among symptomatic cases, pregnant women face alarmingly high mortality rates, with case fatality rates reaching up to 20%. HEV has been implicated in approximately 10,000 annual pregnancy-related deaths in southern Asia alone.
+
+The burden of HEV is amplified in humanitarian crises. Recent large-scale outbreaks in Sudan, Uganda, and South Sudan highlight the devastating consequences of HEV in displaced populations, where crowded living conditions and poor access to clean water exacerbate transmission.
+
+### Transmission Dynamics and Natural History
+
+HEV infection has distinct latent and infectious periods (according to Cooper et al., 2018):
+
+-   **Latent Period:** A mean of 34 days before individuals become infectious.
+
+-   **Infectious Period:** A mean of 35 days during which individuals can transmit the virus.
+
+-   **Transmission Route:** Predominantly fecal-oral, often linked to contaminated water, but studies suggest person-to-person transmission may also play a significant role.
+
+In emergency settings, HEV outbreaks often reveal weaknesses in water, sanitation, and hygiene (WASH) infrastructure. For example, the Uganda outbreak implicated poor water storage practices and communal handwashing as key drivers of transmission.
+
+## Building an SEIR Model for Uganda HEV Outbreak
+
+### Dataset of reported HEV cases
+
+In October 2007, an epidemic of hepatitis E was suspected in IDP camps in Kitgum District of northern Uganda where no previous epidemics had been documented. This outbreak has progressed to become one of the largest hepatitis E outbreaks in the world. By June 2009, the epidemic had caused illness in \>10,196 persons and 160 deaths.
+
+The dataset we will use today records weekly observed cases from three outbreaks in 2007–2009 from IDP camps in the district of Kitgum, Uganda: Agoro, Madi Opei, and Paloga.
+
+The epidemic curves of **observed cases** for each of the three camps is visualized below; however, for today's lesson we will focus on modelling the HEV outbreak in **Paloga**:
+
+![Data source: Cooper et al. (2018)](images/cooper_observed_cases.png){width="366"}
+
+Observed HEV case counts in this dataset were obtained through:
+
+-   Passive surveillance recording **jaundice cases** in camp facilities.
+
+-   Referral of suspected viral hepatitis cases to a clinic in Madi Opei.
+
+-   Serology and PCR confirmation of HEV.
+
+-   Weekly reporting of new HEV cases (2007-2009).
+
+These recorded cases significantly underestimate the actual outbreak incidence, as surveillance primarily captures **symptomatic cases**—a small fraction of total infections. Cooper et al. estimate that only **1 in 7 cases are symptomatic**, meaning the dataset reflects just one-seventh of all cases.
+
+Since our compartmental model predicts total cases, we must adjust its outputs to align with the proportion of symptomatic cases for accurate comparison.
+
+::: key-point
+**Observed vs. Total Case Counts**
+
+When analyzing reported cases in a dataset, it's crucial to recognize that **reported cases ≠ actual incidence**. The number of observed cases is often only a fraction of total cases due to underreporting, limited testing, and delays.
+
+To estimate true incidence, epidemiologists use mathematical models such as **compartmental models (SIR, SEIR)** and more. These models help correct for missing cases and provide a clearer picture of disease spread, informing public health decisions.
+:::
+
+### Model Parameters for HEV
+
+The parameters used in our HEV model are based on known disease characteristics, specifically the time individuals spend in different stages of infection.
+
+The **latent period**, or the time between exposure and becoming infectious, is approximately **5 weeks**, while the **infectious period**, during which individuals can transmit the virus, lasts **2 weeks**. From these durations, we determine the **progression rate** from exposed to infectious and the **recovery rate** from infectious to recovered.
+
+Since our model operates on a weekly time scale, we express these rates as **52/5 per year** and **52/2 per year**, respectively. Other parameters such as the transmission rate ($\beta$) require further estimation and adjustments based on the data.
+
+| **Parameter** | **Value** | **Description** |
+|------------------------|------------------------|------------------------|
+| Transmission Rate ($\beta$) | 120 | Rate of transmission between susceptible and infected |
+| Progression Rate ($\sigma$) | $\frac{52}{5}$ (10.4) | Rate of progression from exposed to infectious |
+| Recovery Rate ($\gamma$) | $\frac{52}{2}$ (26) | Rate of recovery from infectious state |
+| Population Size ($N$) | 10,555 | Total camp population |
+
+::: key-point
+**Determining Model Parameters**
+
+To analyze the 2007–2009 HEV outbreak in Uganda’s IDP camps, we can use the SEIR model with outbreak-specific parameters. These parameters reflect the natural history of HEV, population dynamics, and transmission potential in emergency settings.
+
+Model parameters are critical for accurately simulating disease dynamics. Here’s how they are typically determined:
+
+1.  **Estimation and Adjustment Using Data**:\
+    Parameters like the transmission rate ($\beta$) or progression rate ($\sigma$) are often estimated based on prior knowledge or initial assumptions. These values are then adjusted to better fit observed outbreak data, ensuring the model accurately reflects the real-world dynamics.
+
+2.  **Using Values from the Literature**:\
+    Alternatively, we can adopt parameters directly from published studies when high-quality research is available.
+
+    -   **For this case**: We use the same parameters as those derived in the Cooper et al. study, which analyzed HEV outbreaks in IDP camps. By using their results, our model is aligned with empirical findings from a similar context, increasing the reliability of the simulation.
+
+This approach ensures the SEIR model for HEV is both evidence-based and tailored to the outbreak characteristics in Paloga, Uganda.
+:::
+
+### Initial Conditions
+
+-   **Susceptible** ($S$): 10,554
+-   **Exposed** ($E$): 1 (initially exposed individual)
+-   **Infectious** ($I$): 0
+-   **Recovered** ($R$): 0
+
+## Implementation of the SEIR Model for HEV
+
+Using the SEIR framework, we simulate the progression of the outbreak in an IDP camp. The model tracks the dynamics of HEV transmission over time, considering the latent and infectious periods and the high transmission potential.
+
+### Step 1: Setting up Initial Conditions and Parameters
+
+```{r}
+# Initial conditions for HEV outbreak 
+initial_state <- c(S = 10554, E = 1, I = 0, R = 0)
+
+# HEV-specific parameters 
+parameters <- c(beta = 120,
+                sigma = 52/5,
+                gamma = 52/2)  
+
+# Time span for simulation (200 days) 
+times <- seq(46/52, 156/52, by = 1/52) 
+
+```
+
+### Step 2: Writing the SEIR Model Function
+
+In this step, we define the SEIR model for the HEV outbreak using a **frequency-dependent transmission** approach. Frequency-dependent transmission assumes that the rate of new infections depends on the proportion of infectious individuals relative to the total population, rather than the absolute number of contacts. Here’s why this approach is appropriate for the HEV outbreak:
+
+1.  **Population Size and Contact Rates**:\
+    In crowded settings like IDP camps, the number of contacts an individual has is often proportional to the population size. This means the likelihood of disease transmission depends on the proportion of infectious individuals in the population rather than their absolute number.
+
+2.  **Applicability to Large Populations**:\
+    In frequency-dependent models, the transmission rate ($\beta$) scales with the population size. This ensures that the dynamics are consistent regardless of whether we are modeling a large camp or a smaller community, making it particularly suited for outbreaks in varied population settings.
+
+3.  **HEV Transmission Characteristics**:\
+    Since HEV spreads predominantly through environmental contamination (e.g., water sources), the risk of exposure is tied to the proportion of infectious individuals contributing to contamination. This is effectively captured by a frequency-dependent approach.
+
+The frequency-dependent equations are implemented as follows:
+
+```{r}
+# Define the SEIR model function for HEV (frequency-dependent)
+seir_model_hev <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    
+    N <- S + E + I + R  # Total population size
+    
+    # Define the differential equations
+    dS <- -beta * S * I / N                 # Susceptible to Exposed
+    dE <- beta * S * I / N - sigma * E      # Exposed to Infectious
+    dI <- sigma * E - gamma * I             # Infectious to Recovered
+    dR <- gamma * I                         # Recovered
+    
+    # Return the rates of change
+    list(c(dS, dE, dI, dR))
+  })
+}
+```
+
+### Step 3: Solving the Differential Equations and Converting to dataframe
+
+```{r}
+# Solve the SEIR model for HEV 
+seir_hev_out <- ode(y = initial_state, 
+                    times = times, 
+                    func = seir_model_hev, 
+                    parms = parameters)
+
+# Convert output to data frame for easy plotting
+seir_hev_out <- as.data.frame(seir_hev_out)
+
+```
+
+### Step 4: Visualizing the HEV Dynamics
+
+To understand the progression of symptomatic cases in the HEV outbreak, we use the SEIR model to calculate and graph the predicted new severely symptomatic cases over time. This visualization highlights the modeled outbreak dynamics and prepares us to compare these predictions to observed data.
+
+#### Why These Calculations Are Needed
+
+The SEIR model tracks transitions between compartments, but not all infections result in symptoms. In the case of the Uganda HEV outbreak, only **severely symptomatic cases** were reported, as mild or asymptomatic cases often go undetected, especially in resource-limited settings.
+
+This distinction is critical for accurate modeling because the real-world case counts represent only a fraction of the total infections. To bridge this gap, the model incorporates the proportion of symptomatic cases $(p)$, ensuring alignment between simulated outputs and observed data.
+
+1.  **Real-World Case Reporting**:\
+    Observed data reflects the most visible segment of the outbreak—severely symptomatic cases. Mild and asymptomatic infections, which are undiagnosed and unreported, constitute the majority of infections. Ignoring this discrepancy would lead to underestimating the scale of the outbreak.
+
+2.  **Calculating Total Cases**:\
+    To model the full dynamics of the outbreak, we adjust the observed data using the proportion of symptomatic cases ($p$). For HEV, this proportion is estimated at $(p = \frac{1}{7})$, meaning only about 14% of total infections are symptomatic and likely to be reported.
+
+3.  **Modeling Symptomatic Incidence**:\
+    The number of new symptomatic cases over time can be calculated as: $Symptomatic\ Incidence = p \cdot \sigma \cdot E$ where:
+
+    -   $\sigma$ is the progression rate from **Exposed (E)** to **Infectious (I)**.
+    -   $E$ is the size of the Exposed compartment at a given time.
+
+This calculation ensures that the model’s predicted symptomatic cases are comparable to the observed data, while the full infection dynamics are still accurately represented.
+
+Let's go ahead and visualize the modelled results:
+
+In order to properly visualize the real-world cases, we will need to calculate the symptomatic incidence using the equation seen above.
+
+```{r}
+# Visualizing modeled HEV dynamics
+ggplot() +
+  geom_line(data = seir_hev_out, aes(x = time, y = (1/7) * (0.2) * E), 
+            color = "red", 
+            linewidth = 1) + # Modeled symptomatic cases
+  labs(title = "Modeled Symptomatic HEV Cases (SEIR Model)",
+       x = "Time (years)", 
+       y = "Modeled New Cases") +
+  theme_minimal()
+```
+
+::: practice
+**Question 2**: **Impact of Incubation Period** ($1/\sigma$)
+
+Investigate how the incubation period ($1/\sigma$) affects the timing of the peak infectious population ($I$). Simulate the SEIR model using the following values for $\sigma$: $0.2$, $0.1$, and $0.4$.
+
+**Task**:\
+Record the time to peak $I$ for each value of $\sigma$.
+:::
+
+::: key-point
+**Extending the SEIR Model: Introducing a Water Reservoir (SEIRW)**
+
+For waterborne diseases like Hepatitis E Virus (HEV), including a **water reservoir** compartment ($W$) enhances the SEIR model’s ability to capture indirect transmission through contaminated water. In the **SEIRW model**, water contamination influences the *Exposed* compartment ($E$).
+
+![](images/seirw_model.png){width="448"}
+
+**Key Modifications**
+
+1.  **Contaminated Water** ($W$): The reservoir accumulates virus shed by exposed ($E$) and infectious individuals ($I$) and serves as an indirect source of infection.
+2.  **Water-Driven Exposure**: Susceptible individuals ($S$) become exposed through contact with contaminated water as well as directly from infectious individuals.
+
+**SEIRW ODE Equations**
+
+$$\frac{dS}{dt} = -\beta_1SI - \beta_2SW$$ $$\frac{dE}{dt} = \beta_1 SI + \beta_2SW - \sigma E$$ $$\frac{dI}{dt} = \sigma E - \gamma I$$ $$\frac{dR}{dt} = \gamma I$$ $$\frac{dW}{dt} = \omega E + \omega I$$
+
+Where:
+
+-   $\beta_1$: Transmission rate due to direct contact with infectious individuals.
+
+-   $\beta_2$: Transmission rate due to contact with contaminated water.
+
+-   $\sigma$: Progression rate from exposed to infectious.
+
+-   $\gamma$: Recovery rate of infectious individuals.
+
+-   $\omega$: Contamination rate of the water reservoir through shedding.
+
+**Why Place** $W$ **Under** $E$**?**
+
+In HEV dynamics, individuals become exposed ($E$) after ingesting contaminated water. This aligns the Exposed compartment as the recipient of infection from both:
+
+-   **Direct Transmission** ($\beta_1 SI$): Exposure occurs when susceptible individuals contact infectious individuals directly, governed by the parameter $\beta_1$.
+
+-   **Waterborne Transmission** ($\beta_2 SW$): Exposure also occurs indirectly through contact with the contaminated water reservoir, governed by the parameter $\beta_2$.
+
+By incorporating $W$, the SEIRW model provides a more comprehensive representation of HEV transmission. The explicit inclusion of $W$ highlights the critical role of environmental contamination in sustaining and amplifying outbreaks, which is often a key driver in waterborne disease dynamics.
+:::
+
+::: challenge
+**Building the SEIRW Model**
+
+Extend the SEIR model to include a water reservoir ($W$), accounting for HEV's waterborne transmission.
+
+**Task**:\
+Write the SEIRW model function in R based on the following conceptual diagram:
+
+![](images/seirw_model.png){width="448"}
+:::
+
+## Comparing Observed vs. Simulated Epidemic Curves
+
+With our simulated epidemic curve for the HEV outbreak in Paloga, Uganda, we can now compare it to the actual observed data. This comparison allows us to evaluate how well the SEIR model captures the outbreak dynamics and identify any discrepancies.
+
+### Step 1: Load and Explore the Observed Data
+
+The first step is to load the dataset containing the observed weekly new cases of HEV in Paloga.
+
+Let's load and explore the dataset in R.
+
+```{r message=F, render=.reactable_10_rows}
+# Load observed data  
+uganda_hev <- read_csv(here("data/uganda_hev.csv"))
+```
+
+The data frame `uganda_hev` contains 5 columns:
+
+-   `epi_year`: The calendar year in which cases were recorded. Ranges from the beginning of 2007 to the end of 2009.
+-   `epi_week`: The number of weeks since the outbreak began (starting from week 1). Ranges from 1-156, with 52 weeks for each of the 3 years.
+-   `agoro`: The number of weekly new cases of HEV reported in the IDP camp Agoro.
+-   `madi_opei`: The number of weekly new cases of HEV reported in the IDP camp Madi Opei.
+-   `paloga`: The number of weekly new cases of HEV reported in the IDP camp Paloga.
+
+This data provides the real-world epidemic curve that we’ll compare to our model’s predictions and will serve as the basis for constructing the observed epidemic curve.
+
+### Step 2: Create the Comparison Graph
+
+To visually compare the observed and simulated epidemic curves, we overlay them on a single graph:
+
+1.  **Observed Epidemic Curve**:\
+    Represented as a black line with points, this curve shows the actual reported weekly new cases in Paloga ONLY.
+2.  **Simulated Epidemic Curve**:\
+    Represented as a red line, this curve plots the simulated number of new symptomatic cases based on the SEIR model.
+
+Here’s the R code to create the graph:
+
+```{r}
+# Create comparison graph
+comparison_graph <- 
+  ggplot() +
+  # Plot observed epidemic curve
+  geom_line(data = uganda_hev, aes(x = epi_week/52, y = paloga), 
+            color = "black", linewidth = 1) +
+  geom_point(data = uganda_hev, aes(x = epi_week/52, y = paloga), 
+             color = "black") +
+  # Plot simulated epidemic curve
+  geom_line(data = seir_hev_out, aes(x = time, y = (1/7) * (0.2) * E), 
+            color = "red", linewidth = 1) +
+  labs(x = "Time (weeks)", 
+       y = "New Cases", 
+       title = "Comparison of Observed vs. Simulated HEV Epidemic Curves") +
+  theme_minimal()
+
+# Display the graph
+comparison_graph
+```
+
+The graph displays two curves:
+
+1.  **Observed Curve (Black Line)**: Represents the real-world epidemic data from Paloga, showing the number of new HEV cases reported weekly.
+2.  **Simulated Curve (Red Line)**: Shows the predicted symptomatic cases from the SEIR model.
+
+**Key Points to Evaluate**:
+
+-   **Alignment**: Do the peaks and overall shape of the simulated curve match the observed data?
+
+-   **Peak Timing**: Is the timing of the simulated peak consistent with the observed outbreak?
+
+-   **Scale Differences**: Are the simulated and observed case counts comparable, or is there a mismatch in magnitude?
+
+A close alignment between the curves suggests that the SEIR model accurately represents the HEV dynamics, validating its assumptions and parameter estimates. Discrepancies, on the other hand, highlight areas where the model could be improved, such as refining parameter estimates or incorporating additional factors.
+
+# Conclusion {.unnumbered}
+
+In this lesson, we explored the SEIR model with a focus on the exposed compartment and applied it to Hepatitis E Virus. Including an exposed compartment allows us to realistically model diseases with latent periods, like HEV.
+
+# Answer Key {.unnumbered}
+
+::: answer
+**Answer 1**: **Impact of Initial Conditions in a Generic SEIR Model**
+
+```{r}
+# Define SEIR model function
+seir_model <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dS <- -beta * S * I
+    dE <- beta * S * I - sigma * E
+    dI <- sigma * E - gamma * I
+    dR <- gamma * I
+    list(c(dS, dE, dI, dR))
+  })
+}
+
+# Parameters
+parameters <- c(beta = 0.002, sigma = 0.2, gamma = 0.1)
+
+# Time sequence
+times <- seq(0, 100, by = 1)
+
+# Scenario 1: Initial conditions
+initial_state_1 <- c(S = 990, E = 5, I = 4, R = 0)
+out_1 <- ode(y = initial_state_1, times = times, func = seir_model, parms = parameters)
+
+# Scenario 2: Initial conditions
+initial_state_2 <- c(S = 800, E = 50, I = 150, R = 0)
+out_2 <- ode(y = initial_state_2, times = times, func = seir_model, parms = parameters)
+
+# Convert outputs to data frames
+out_1 <- as.data.frame(out_1)
+out_2 <- as.data.frame(out_2)
+
+# Plot results
+ggplot() +
+  geom_line(data = out_1, aes(x = time, y = I), color = "blue", size = 1, linetype = "solid", label = "Scenario 1") +
+  geom_line(data = out_2, aes(x = time, y = I), color = "red", size = 1, linetype = "dashed", label = "Scenario 2") +
+  labs(title = "Infectious Population Over Time", x = "Time (days)", y = "Number of Infectious Individuals") +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+```
+
+-   **Scenario 1**: The outbreak progresses slowly and peaks later, with a smaller infectious population at its peak.\
+-   **Scenario 2**: The outbreak spreads faster due to the higher initial number of exposed and infected individuals, resulting in a higher peak infectious population.\
+:::
+
+::: answer
+**Answer 2**: **Effect of Incubation Period** ($1/\sigma$)
+
+```{r}
+# Define parameters
+parameters <- c(beta = 0.002, gamma = 0.1)
+
+# Initial conditions
+initial_state <- c(S = 990, E = 5, I = 4, R = 0)
+
+# Time sequence
+times <- seq(0, 100, by = 1)
+
+# Simulations for different sigma values
+sigma_values <- c(0.2, 0.1, 0.4)
+results <- list()
+
+for (sigma in sigma_values) {
+  parameters["sigma"] <- sigma
+  sim <- ode(y = initial_state, times = times, func = seir_model, parms = parameters)
+  results[[paste0("sigma_", sigma)]] <- as.data.frame(sim)
+}
+
+# Extract peak times for each simulation
+peak_times <- sapply(results, function(df) {
+  df$time[which.max(df$I)]
+})
+
+# Plot infectious populations
+ggplot() +
+  geom_line(data = results[["sigma_0.2"]], aes(x = time, y = I), color = "blue", linetype = "solid") +
+  geom_line(data = results[["sigma_0.1"]], aes(x = time, y = I), color = "red", linetype = "dashed") +
+  geom_line(data = results[["sigma_0.4"]], aes(x = time, y = I), color = "green", linetype = "dotted") +
+  labs(title = "Impact of Incubation Period on Infectious Population", x = "Time (days)", y = "Number of Infectious Individuals") +
+  theme_minimal()
+
+# Print peak times
+print(peak_times)
+```
+
+-   **Peak Times**:
+    -   $\sigma = 0.2$: Peak occurs earlier.\
+    -   $\sigma = 0.1$: Peak is delayed.\
+    -   $\sigma = 0.4$: Peak occurs the fastest.\
+:::
+
+::: answer
+**Challenge**: **Building the SEIRW Model**
+
+```{r}
+# Define SEIRW model function
+seirw_model <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    # Differential equations
+    dS <- -beta_1 * S * I - beta_2 * S * W
+    dE <- beta_1 * S * I + beta_2 * S * W - sigma * E
+    dI <- sigma * E - gamma * I
+    dR <- gamma * I
+    dW <- lambda * I - lambda * W
+    
+    # Return the rate of change
+    list(c(dS, dE, dI, dR, dW))
+  })
+}
+```
+:::
+
+# Contributors {.unlisted .unnumbered}
+
+The following team members contributed to this lesson:
+
+`r .tgc_contributors_list(ids = c("sabina", "joy"))`
+
+# References {.unlisted .unnumbered}
+
+-   Modeling Infectious Diseases in Humans and Animals - M. J. Keeling & P. Rohani.
+-   Hepatitis E: Epidemiology and Disease Burden - WHO Report.
+-   Childs, Lauren M., Nadia N. Abuelezam, Christopher Dye, Sunetra Gupta, Megan B. Murray, Brian G. Williams, and Caroline O. Buckee. "Modelling Challenges in Context: Lessons from Malaria, HIV, and Tuberculosis." Epidemics 10 (2015): 102–7. <https://doi.org/10.1016/j.epidem.2015.02.002>.
+-   Cooper, Ben S., Lisa J. White, and Rehan Siddiqui. "Reactive and Pre-emptive Vaccination Strategies to Control Hepatitis E Infection in Emergency and Refugee Settings: A Modelling Study." *PLOS Neglected Tropical Diseases* 12, no. 9 (2018): e0006807. <https://doi.org/10.1371/journal.pntd.0006807>.
+-   Nana-Kyere, Sacrifice, Eric Okyere, and Johnson De-Graft Ankamah. "Compartmental SEIRW COVID-19 Optimal Control Model." *Communications in Mathematical Biology and Neuroscience* 2020, no. 87 (2020). <https://doi.org/10.28919/cmbn/4998>.
+
+`r .tgc_license()`

@@ -1,0 +1,506 @@
+---
+title: 'Lesson 8 | The Effective Reproduction Number R~e~'
+output:
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    css: !expr here::here("global/style/style.css")
+    highlight: kate
+editor_options:
+  markdown:
+    wrap: 100
+  canonical: true
+  chunk_output_type: inline
+---
+
+```{r, echo = F, message = F, warning = F}
+# Functions
+source(here::here("global/functions/lesson_functions.R"))
+
+knitr::opts_chunk$set(eval = F)
+```
+
+------------------------------------------------------------------------
+
+# Introduction {.unnumbered}
+
+In this lesson, we delve into the effective reproduction number, R~e~, a key epidemiological measure that gauges the current potential of an infectious disease to spread within a population. Unlike R~0~, which is calculated under the assumption of a fully susceptible population, R~e~ takes into account the real-world dynamics of immunity and intervention impacts. Importantly, R~e~ is time-dependent, reflecting changes in the population and intervention measures over time.
+
+# Learning Objectives {.unnumbered}
+
+1)  Define the effective reproduction number R~e~ for infectious diseases.
+2)  Calculate R~e~ for a given infectious disease model.
+3)  Derive the R~e~ expression from SIR model ODEs.
+4)  Understand the implications, assumptions, and limitations of R~e~.
+
+# Overview of Reproduction Numbers
+
+## Basic Reproduction Number (R~0~)
+
+R~0~, the basic reproduction number, signifies the average number of secondary infections that an infected individual will produce in a **completely susceptible population**.
+
+For example, if the R~0~ is 2, then one infected person will infect, on average, two new people before they recover.
+
+![](images/r0_of_2.gif)
+
+The definition assumes that there is **only** **one infectious individual at the start, and all others are susceptible**.
+
+It is a foundational concept in epidemiology for assessing the potential severity of infectious diseases at the outset of an outbreak.
+
+For the SIR model with frequency-dependent transmission, R~0~ is calculated with the formula:
+
+$$ R_0 = \frac{\beta}{\gamma} $$
+
+where $\beta$ is the transmission rate, and $\gamma$ is the recovery rate.
+
+R~0~ offers a baseline measure of an epidemic's potential to expand at **the very beginning**, when the population is virtually 100% susceptible.
+
+![R0 measures transmission potential at t = 0](images/clipboard-2496891548.png)
+
+## Effective Reproduction Number (R~e~)
+
+R~e~, or the effective reproduction number, adapts the concept of R~0~ to reflect the **ongoing conditions as the epidemic progresses**. It estimates the number of secondary infections that occur at any given time, taking into account the current proportion of the population that remains susceptible.
+
+::: key-point
+R~e~ is inherently time-dependent, changing as the epidemic progresses and the proportion of susceptibles decreases as a result of infection, recorver, or as interventions are implemented.
+:::
+
+## Transitioning from R~0~ to R~e~
+
+The basic reproduction number R~0~ measures reproduction at the **beginning of the epidemic *t=0***, when there is one infectious case in a fully susceptible population.
+
+![R0 of 2 in a fully susceptible population](images/R0_of_2_visualization_1.gif)
+
+R~0~ becomes less relevant as the epidemic progresses and the population is no longer fully susceptible, due to immunity or control measures. **As the number of susceptibles decreases, there is a “wastage” of transmissions**.
+
+For example, if some proportion of the population is vaccinated to prevent spread, then infectious individuals will have contacts with those that are not susceptible, reducing the reproduction rate of the disease.
+
+![While R0 for the disease (the transmission potential) is still 2, the effective reproduction rate is lower because the population is only partially susceptible.](images/R0_of_2_visualization_2.gif)
+
+The effective reproduction number R~e~ measures reproduction rate of the infection at **any given time *t*** in the epidemic, when the population is **no longer fully susceptible**.
+
+### Tracking R~e~ for a sample outbreak
+
+Let's visualize this with an example, where we examine the reproductive number at three different points in a simulated epidemic:
+
+-   R~0~ when the population is fully susceptible
+
+-   R~e~ when two-thirds of the population is susceptible
+
+-   R~e~ when one-third of the population is susceptible
+
+This outbreak was simulated with an R~0~ of 3, suggesting rapid spread. However, the pool of susceptibles diminishes over time, thereby reducing the reproduction number.
+
+For instance, once the fraction of susceptibles drops to two-thirds, an infectious person who would have infected three others at the beginning of an outbreak now ‘wastes’ one of their transmissions, and therefore only infects two others.
+
+The reproduction number at this point is measured by R~e~, which is 2.
+
+Similarly, once 1/3 of the population is susceptible, R~e~ will have dropped to 1.
+
+![](images/clipboard-606714843.png){width="662"}
+
+At this point, the outbreak has reached its peak. From our definition, when R=1, the outbreak does not grow further nor does it decay (recall, we need R\>1 for growth or R\<1 for decay).
+
+![](images/clipboard-1386830335.png)
+
+However, the peak with R=1 is somewhat instantaneous as, now, more than 2/3 of the population have become infected or immune which causes R to drop below 1. Thus, the outbreak starts to decline, with R continuing to go down as fewer and fewer susceptibles remain.
+
+This illustrates the time-dependent nature of R~e~, and the impact of increasing immunity on the disease's ability to spread over time.
+
+# Defining R~e~
+
+> The effective reproductive number (R~e~) is the average number of secondary cases per infectious case in a population at a given time t in the epidemic, when the population may no longer be entirely susceptible.
+
+::: vocab
+**R~e~ Terminology and Notation**
+
+The effective reproduction number (R~e~) is sometimes denoted R~eff~ or simply R. As with R~0~, the symbol *R* stands for reproduction.
+
+It can also be referred to as R~t~, defined as the average number of secondary cases per infectious case at time $t$ in the epidemic.
+:::
+
+::: practice
+**Practice Exercise: SIR Model Simulation**
+
+Let's simulate the example described in words above, using real R code. The first step is to choose a modelling framework. For this question, we will be using the classic SIR model with three compartments and a closed population (N stays constant).
+
+![](images/sir_model_recap_colored.png){width="535"}
+
+As a reminder, the compartments and parameters of the SIR model are the following:
+
+-   **Susceptible (S)**: Number of individuals who can become infected (total population at risk).
+-   **Infected (I)**: Number of individuals who are infected and can transmit the disease.
+-   **Recovered (R)**: Number of individuals who have recovered and are no longer infectious.
+-   **Transmission coefficient (β)**: The rate at which susceptible individuals become infected.
+-   **Recovery rate (γ)**: The rate at which infected individuals recover. This is the inverse of the infectious period.
+
+**Step 0**: Load the packages needed for SIR modelling in R
+
+This code has been written for you:
+
+```{r}
+# Load packages 
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load(deSolve, # to solve differential equations
+               tidyverse) # includes dplyr and ggplot2
+```
+
+**Step 1**: Setting up Initial Conditions and Parameters
+
+The initial conditions for this question are:
+
+-   **Total population (N):** 120
+-   **Initial infected (I):** 1 (patient zero)
+-   **Initial susceptible (S):** 119 (120 total - 1 infected)
+-   **Initial recovered (R):** 0 (none recovered at the start)
+
+```{r}
+# Define the initial conditions
+initial_state <- "WRITE_YOUR_CODE_HERE"
+
+initial_state
+```
+
+Next, let's calculate the values of $\beta$ and $\gamma$
+
+a)  If the duration of the infectious period is 2 days. Calculate the value of $\gamma$.
+
+b)  The $R_0$ for this disease is 3. If we assume frequency-dependent transmission for this disease, calculate the value of $\beta$.
+
+Make the duration of the simulation 1 month (30 days), with a time interval of 0.5 days.
+
+```{r}
+# Time span for the simulation
+times <- seq(0, 30, by = 0.5)
+```
+
+**Step 2**: Writing the SIR Model Functions
+
+Now that we've set up our initial conditions and parameters, we'll implement the SIR model using the `{deSolve}` package.
+
+Start by defining a function called `sir_model` with differential equations for S, I, and R. Note that we are modelling *frequency-dependent transmission* in a *closed* population.
+
+As a reminder, here are the three components of the function:
+
+![](images/sir_model_code_breakdown.png)
+
+```{r}
+# Define function and arguments
+sir_model <- function(times, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    N <- "WRITE_YOUR_CODE_HERE"
+    # Rate of change
+    dS <- "WRITE_YOUR_CODE_HERE"
+    dI <- "WRITE_YOUR_CODE_HERE"
+    dR <- "WRITE_YOUR_CODE_HERE"
+    
+    # Return the rate of change
+    list(c("WRITE_YOUR_CODE_HERE"))
+  })   # end with (as.list...) 
+}
+```
+
+**Step 3**: Solving the Differential Equations
+
+Use the `ode()` function from the `{deSolve}` package to solve the differential equations of your SIR model.
+
+```{r}
+# Solve the ordinary differential equations
+sir_out <- ode(
+  # inital state
+  "WRITE_YOUR_CODE_HERE",
+  # sequence of time points
+  "WRITE_YOUR_CODE_HERE",
+  # model function
+  "WRITE_YOUR_CODE_HERE", 
+  # parameters in the model
+  "WRITE_YOUR_CODE_HERE"
+)
+```
+
+Convert the output to a data frame for easier manipulation and visualization
+
+```{r}
+# Convert to data frame
+sir_out <- "WRITE_YOUR_CODE_HERE"
+
+sir_out
+```
+
+**Step 4**: Visualize the results
+
+Create a plot using `{ggplot2}` to graph all three predicted lines (S, I, R).
+
+```{r}
+# Create a plot to visualize the dynamics of the SIR model
+ggplot(sir_out, aes(x = time)) +
+  # Graph Susceptible line
+  geom_line(aes(y = S, color = "Susceptible"), size = 1) +
+  # Graph Infected line
+  geom_line(aes(y = I, color = "Infectious"), size = 1) +
+  # Graph Recovered line
+  geom_line(aes(y = R, color = "Recovered"), size = 1) +
+  # Add title and labels
+  labs(title = "SIR Model Simulation, R0 of 3", x = "Time (days)") +
+  # Specify color for each line
+  scale_color_manual(values = c("Susceptible" = "#2F5597", "Infectious" = "#C00000", "Recovered" = "#548235")) +
+  # Select theme 
+  theme_light() +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0))
+```
+:::
+
+# Calculating R~e~
+
+We can intuitively observe that R~e~ is scales with the proportion of susceptibles available in the population. Therefore, R~e~ can be expressed as a modified version of R~0~, adjusted for the current number of susceptible individuals. R~e~ at a given time t can be calculated by the equation:
+
+$$ R_e = R_0 \times \frac{S}{N} $$
+
+-   $R_0$ is the basic reproduction number.
+-   $S$ is the current number of susceptible individuals.
+-   $N$ is the total population size.
+
+This formula underscores that R~e~ decreases as the number of susceptible individuals, $S$, declines relative to the total population, $N$. Since $S$ changes over time, R~e~ is also time-dependent.
+
+## SIR curves for disease with an R~0~ of 3
+
+-   R~0~ when the population is fully susceptible
+
+![](images/clipboard-874525353.png)
+
+-   R~e~ when two-thirds of the population is susceptible
+
+![](images/clipboard-3731650275.png)
+
+-   R~e~ when one-third of the population is susceptible
+
+![](images/clipboard-704019836.png)
+
+In summary, we can visually confirm that the R~e~ equation applies to all time points in the epidemic.
+
+![](images/clipboard-4053339148.png)
+
+::: practice
+## Practice Exercise: Estimate $R_0$ from SIR Curves {.unlisted .unnumbered}
+
+Examine this plot, showing the SIR dynamics of a disease with an unknown R~0~. By applying the insights you have learned in this lesson, estimate the value of R~0~ for this epidemic.
+
+![](images/pq_est_r0_from_curve.png){width="526"}
+
+**Hint**: Look at the proportion of Susceptibles at the epidemic peak, when dI/dt = 0.
+
+![](images/pq_est_r0_from_curve_hint.png){width="497"}
+:::
+
+# Mathematical Derivation of the $R_e$ expression from SIR ODEs
+
+## Calculating R~e~ for Density-Dependent Transmission
+
+The rates of change in these compartments for DD transmission are governed by the following ordinary differential equations (ODEs):
+
+$$
+\frac{dS}{dt} = -\beta S I, \quad \frac{dI}{dt} = \beta S I - \gamma I, \quad \frac{dR}{dt} = \gamma I
+$$
+
+-   **S** = Susceptible individuals
+-   **I** = Infected individuals
+-   **R** = Recovered individuals
+-   $\beta$ represents the transmission coefficient
+-   $\gamma$ represents the recovery rate
+
+![](images/sir_model_recap_colored.png){width="532"}
+
+1.  **Start with the expression for** $\frac{dI}{dt}$:
+
+Given $\frac{dI}{dt} = \beta S I - \gamma I$, for the disease to persist in the population, $\frac{dI}{dt}$ must be greater than zero.
+
+2.  **Rearrange to highlight the infection terms**:
+
+$$ \beta S I - \gamma I > 0 $$ $$ \beta S I > \gamma I $$ Dividing all terms by $I$ (assuming $I > 0$): $$ \beta S > \gamma $$
+
+3.  **Isolate the susceptible ratio**:
+
+Divide by $\gamma$ to find the condition under which the infection grows:
+
+$$ \frac{\beta S_t}{\gamma} > 1 $$
+
+4.  **Relate to R~0~**:
+
+Recognizing that $R_0 = \frac{\beta N}{\gamma}$ for density-dependent transmission, substitute to express in terms of $S$ and $N$:
+
+$$ \frac{\beta S}{\gamma} = \frac{\beta N}{\gamma} \times \frac{S}{N}  = R_0 \times \frac{S}{N} $$
+
+Thus, we have:
+
+$$ R_e = R_0 \times \frac{S}{N} $$
+
+## Calculating R~e~ for Frequency-Dependent Transmission
+
+For frequency-dependent transmission, the contact rate is adjusted for the population size, thereby making the transmission rate depend not just on the number of contacts an infected individual has, but also on the proportion of those contacts that are with susceptible individuals. This model is particularly relevant in large, mixed populations where the probability of contact between any two individuals is low.
+
+In the case of frequency-dependent transmission, the transmission term is modified to $\frac{\beta S I}{N}$, reflecting that each infectious individual makes contact with a fraction of the population that is proportional to the total number of susceptible individuals divided by the total population size. The ODEs are:
+
+$$
+\frac{dS}{dt} = -\frac{\beta S I}{N}, \quad \frac{dI}{dt} = \frac{\beta S I}{N} - \gamma I, \quad \frac{dR}{dt} = \gamma I
+$$
+
+Given the modified infection term, R~e~ can be derived similarly by analyzing the growth condition of $\frac{dI}{dt}$:
+
+1.  **From the equation for** $\frac{dI}{dt}$:
+
+$$ \frac{\beta S I}{N} - \gamma I > 0 $$
+
+2.  **Isolate the transmission terms**:
+
+$$ \frac{\beta S I}{N} > \gamma I $$
+
+Dividing by $I$ and rearranging:
+
+$$ \frac{\beta S}{N} > \gamma $$
+
+3.  **Express in terms of R~0~**:
+
+For frequency-dependent transmission, if we consider $R_0$ under initial conditions where $S \approx N$, then:
+
+$$ R_0 = \frac{\beta}{\gamma} $$
+
+Thus, substituting back:
+
+$$ R_e = R_0 \times \frac{S}{N} $$
+
+This calculation reaffirms that R~e~, like R~0~, diminishes as the proportion of susceptible individuals in the population decreases, but does so in a manner that is adjusted for the total population, which is crucial in densely populated or highly mixed environments.
+
+## Implications of R~e~
+
+How does R~e~ reflect the progression of an outbreak?
+
+**R~e~ \> 1**
+
+![](images/clipboard-3099202522.png){width="271"}
+
+Each infected patient will go on to infect on average more than one person. Number of cases may increase exponentially over time.
+
+**R~e~ = 1**
+
+![](images/clipboard-4276158812.png){width="218"}
+
+Each infected patient will go on to infect one other person. Statistically, this would suggest that the outbreak is stabilizing, with no changes in number of infected people over time.
+
+**R~e~ \< 1**
+
+![](images/clipboard-852643875.png){width="214"}
+
+Each infected patient will go on to infect on average less than one person, meaning fewer people are being infected which suggests the outbreak is slowing down over time.
+
+In summary, we can visualize the time dependent nature of R~e~ with a graph like this:
+
+![](images/anatomy_epidemic_Re.png){width="571"}
+
+# Conclusion {.unnumbered}
+
+R~e~ is time-dependent and effectively captures the current dynamics of disease transmission, reflecting changes in population susceptibility. It is a critical measure for understanding the control measures' impact on an outbreak and determining strategies for intervention.
+
+------------------------------------------------------------------------
+
+# Answer Key {.unnumbered}
+
+## SIR Model Simulation
+
+```{r}
+# Load packages 
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load(deSolve, # package to solve differential equations
+               tidyverse, # package that includes ggplot2
+               here)
+```
+
+```{r}
+# Define the parameters
+parameters <- c(beta = 1.5, # Transmission rate
+                gamma = 0.5)   # Recovery rate
+
+initial_state <- c(S = 119, I = 1, R = 0)
+
+
+# Time span for the simulation
+times <- seq(0, 30, by = 0.5)
+
+sir_model <- function(times, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    N <- S+I+R
+    # Rate of change
+    dS <- -beta * S * I / N
+    dI <- (beta * S * I / N) - gamma * I
+    dR <- gamma * I
+    
+    # Return the rate of change
+    list(c(dS, dI, dR))
+  })   # end with (as.list...) 
+}
+
+sir_out <- ode(
+  # inital state
+  y = initial_state,
+  # sequence of time points
+  times = times,
+  # model function
+  func = sir_model, 
+  # parameters in the model
+  parms = parameters
+)
+
+sir_out <- as.data.frame(sir_out)
+
+sir_out
+```
+
+```{r}
+# Create a plot to visualize the dynamics of the SIR model
+ggplot(sir_out, aes(x = time)) +
+  # Graph Susceptible line
+  geom_line(aes(y = S, color = "Susceptible"), size = 1) +
+  # Graph Infected line
+  geom_line(aes(y = I, color = "Infectious"), size = 1) +
+  # Graph Recovered line
+  geom_line(aes(y = R, color = "Recovered"), size = 1) +
+  # Add title and labels
+  labs(title = "SIR Model Simulation, R0 of 3", x = "Time (days)") +
+  # Specify color for each line
+  scale_color_manual(values = c("Susceptible" = "#2F5597", "Infectious" = "#C00000", "Recovered" = "#548235")) +
+  # Select theme 
+  theme_light() +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0))
+
+```
+
+```{r}
+sir_out <- sir_out %>% mutate(sir_out,
+                   Prop = S/(S+I+R))
+
+max_I_prop <- sir_out$Prop[which.max(sir_out$I)]
+max_I_prop
+
+1/max_I_prop
+```
+
+## Estimate $R_0$ from SIR Curves
+
+$R_0 = 2$ because $S/N = 0.5$ when $R_e = 1$. The calculation steps can be done as follows:
+
+$$ R_e = R_0 \times \frac{S}{N} $$
+
+$$ 1 = R_0 \times 0.5 $$
+
+$$ R_0 = \frac{1}{0.5} = 2 $$
+
+# Contributors {.unlisted .unnumbered}
+
+The following team members contributed to this lesson:
+
+`r .tgc_contributors_list(ids = c("joy", "sabina"))`
+
+`r .tgc_license()`

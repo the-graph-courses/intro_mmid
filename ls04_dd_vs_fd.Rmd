@@ -1,0 +1,430 @@
+---
+title: "Lesson 4 | Density-dependent vs. Frequency-dependent Transmission"
+output:
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    css: here::here("global/style/style.css")
+    highlight: kate
+editor_options:
+  markdown:
+    wrap: none
+  canonical: true
+  chunk_output_type: inline
+---
+
+```{r, echo = F, message = F, warning = F}
+# Functions
+source(here::here("global/functions/lesson_functions.R"))
+```
+
+------------------------------------------------------------------------
+
+# Introduction {.unnumbered}
+
+Diseases transmission patterns differ based on the pathogen's biology, the host population’s behavior, interaction patterns, and the environment in which the transmission is taking place. In this lesson, we will explore two types of disease transmission: **density-dependent transmission** and **frequency-dependent transmission**.
+
+# Learning Objectives {.unnumbered}
+
+-   Understand how assumptions about transmission affect the **transmission term** of an SIR model
+-   Explain the difference between **density-dependent and frequency-dependent transmission**.
+-   Understand the shape of the **contact rate function** with regards to host density.
+-   Break down the **β parameter** of the transmission term into its component parts.
+-   Define the **force of infection** and express it in mathematical terms.
+-   **Derive SIR model equations** for both DD and FD transmission.
+-   Understand how to **choose between DD and FD models** based on disease transmission routes, pathogen type, and social context.
+-   **Understand the limitations** of simplifying transmission into two distinct types.
+
+# Modelling Infectious Disease Transmission
+
+## Background
+
+Mathematical analysis and modelling is central to infectious disease epidemiology, providing insights into how diseases may spread through populations, projecting the size of outbreaks, and evaluating the potential impact of interventions.
+
+::: recap
+**Recap: What is a mathematical model?**
+
+A model is a simplified representation of a more complex system or process. Models are used throughout disciplines – from economics to medicine – to approximate real-world systems and analyse their behavior.
+
+![](images/modeling.png)
+
+Mathematical models in epidemiology simplify the complex realities of disease transmission and represent them in mathematical language.
+
+![](images/abstraction.png)
+:::
+
+**Transmission models**, a category of mathematical models of infectious disease, representing transmission and progression of infectious disease through a population. Transmission models are *mechanistic*, meaning they use equations to represent the processes underlying disease transmission.
+
+![](images/clipboard-2678622274.png){width="393"}
+
+So far in this course, we have used SIR-type compartmental models to represent infectious disease transmission through a population.
+
+**Compartmental models** group the population into categories, or compartments, based on infection status. The model uses differential equations to describe how individuals move between compartments.
+
+In the SIR model framework, transmission is the process of susceptible (S) individuals becoming infected (I). Traditionally, the movement between S and I compartments is governed by the transmission coefficient (β).
+
+![](images/bath_tub_sir_model_colored.png){width="672"}
+
+As discussed in previous lessons, β is not strictly a rate; it is a combination of contact rates and infection probability. The formulation of β varies from model to model depending on the assumptions we make about transmission.
+
+All our model equations in the course so far have assumed density-dependent transmission, where the transmission between S and I is represented by βSI. This is called the **transmission term**.
+
+![](images/sir_model_intro_full.png){width="541"}
+
+This mathematical representation of transmission is only valid under specific assumptions about contact rate and transmission probability.
+
+This density-dependent transmission model assumes that higher population density (more people per unit area) leads to more contacts per person, and therefore more transmissions.
+
+![](images/dd_assumption.png){width="535"}
+
+In this lesson we will learn why this assumption of **density-dependent transmission doesn't apply to many diseases**, and how to adapt the SIR model equations to represent an alternative assumption: **frequent-dependent transmission**.
+
+::: vocab
+**What counts as a contact?**
+
+The meaning of "contact" can change depending on the disease. For an airborne pathogen, an eligible contact between individuals mean that they breathe the same air.
+
+-   For a blood-borne pathogen, a contact may require sharing needles or other injection equipment.
+
+-   For a sexually transmitted infection, a contact may require the exchange of bodily fluids.
+
+-   For a fecal-oral disease, a contact may involve ingestion of contaminated water.
+
+[AIRPLANE SNEEZE VIDEO]
+:::
+
+# The Fundamental Difference Between Density-dependent and Frequency-dependent Transmission
+
+The key difference between density and frequency dependence is the assumed relationship between population density and per capita contact rate.
+
+::: vocab
+**Population density** – the total number of individuals per unit area.
+
+**Contact rate** – the number of potentially infectious contacts made per person per unit time. An "eligible" contact is one that would allow pathogen transmission (i.e., capable of resulting in infection if the contact was between a susceptible and an infected.)
+:::
+
+In **density-dependent (DD) transmission**, the per capita contact rate **depends** on the population density. So, transmission rates increase with density. i.e., the more crowded an area is, the more contacts there will be between individuals, therefore there will be more successful transmissions per person.
+
+![](images/Screenshot%202024-10-25%20164952.png){width="447"}
+
+In **frequency-dependent (FD) transmission**, the per capita contact rate **does not depend** on the population density. So transmission rates do not change with density. i.e., the number of transmissions per person in a crowded area vs. a sparsely populated area will be roughly the same.
+
+**General assumptions**:
+
+-   Random mixing: individuals in the population mix completely with each other and move randomly throughout the area
+
+-   Constant population size (N)
+
+Notice that in the two network figures above, the area is constant – i.e., the size of the circles are the same, it is only the number of individuals that increases. For the purposes of this lesson, we will assume that the area (A) occupied by a population remains constant, and only the total population size (N) is changing. Therefore, the population density (N/A) is equal to N. This is important to keep in mind and will come into play later, when we derive the SIR ODEs for DD and FD transmission.
+
+## Factors that determine transmission type
+
+### Pathogen transmission route
+
+Density dependence may be seen in airborne pathogens in a closed space like an airplane cabin. If you have twice as many people in the same area, it's likely that you will get twice as many "exposure events" or contacts because all of these people are breathing the same air.
+
+But there are some types of contacts that don't become increasingly more likely as population density increases. For example, a disease transmitted by bodily fluids or touch (such as via PDA) may exhibit frequency-dependence. Adding more individuals to the same room does not necessarily mean that those individuals are more likely to be making out.
+
+![](images/dd_fd_example1.png)
+
+Therefore, airborne pathogens are more often modeled with density-dependent models, as we did with measles in previous lessons. Whereas pathogens transmitted by close contact – such as kissing, hugging, handshakes, or food sharing – are more often modeled with frequency-dependent models.
+
+### Social context
+
+On the other hand, the same disease with the same transmission route may be modeled with density dependence or frequency dependence, according to the social context in which transmission is taking place.
+
+For example, let's consider a disease that is transmitted via handshakes. If the transmission is taking place at a social event such as a conference, one may want to meet and greet as many people as possible. The number of handshakes per person can be assumed to increase with host density, because everyone at the conference wants to meet everyone else. Here we would assume density-dependent transmission.
+
+In a different social context, the frequency of handshakes may not increase with the "crowdedness" of an area. For example, let's say you are walking down the street in your hometown, and you have the habit of shaking hands whenever you meet someone you know. On a less crowded street, so you are less likely to meet one of your friends. In a more crowded street with double the population, you would meet twice the number of friends and shake their hands. Though the total number of handshakes increases, the per capita contact rate stays the same. Here we would assume frequency-dependent transmission.
+
+![](images/dd_fd_example2.png)
+
+::: practice
+**Practice Question**
+
+In the image below, a population of 40 individuals are pushed into a smaller area, and the number of contacts per person increases.
+
+![](images/density_dep_simple.png){width="334"}
+
+This is an example of:
+
+A)  Density-dependence
+
+B)  Frequency-dependence
+:::
+
+# The contact rate function
+
+Density dependence assumes the **contact rate increases linearly** with density, whereas frequency dependence assumes a **constant contact rate** regardless of density.
+
+We can visualize this with a simple graph.
+
+![Density dependence assumes relationship between c and N/A increases linearly, whereas frequency dependence assumes a constant contact rate regardless of density.](images/dd_fd_contact_rate_function_simple.png){width="416"}
+
+In reality, there are many other proposed transmission equations. For now, we will focus on these two linear contact rate functions. Towards the end of the lesson, we will explore some non-linear relationships between c and N/A.
+
+::: key-point
+The key difference between density and frequency dependence is the assumed relationship between population density (N/A) and per capita contact rate (c).
+
+-   In DD transmission, contact rate is assumed to increase linearly with host density.
+
+-   In FD transmission, contact rate is assumed to stay constant and independent of host density.
+
+![](images/dd_fd_networks_summary.jpg)
+:::
+
+## Dr. Blue
+
+Sometimes it is easier to say those two sentences than to truly understand what they mean, so let’s do a little thought experiment: A man named Dr. Blue is going clubbing, and can either go to Club 1 or Club 2.
+
+![](images/clipboard-2882928436.png){width="559"}
+
+**Scenario 1**
+
+It is flu season, and while deciding which club to frequent, Dr. Blue wonders whether Club 1 or Club 2 is better for avoiding disease transmission. The two clubs are exactly the same size (A~1~ = A~2~ = 1), but Club 2 always has more people than Club 1 (N~1~ \< N~2~; i.e., Club 2 has a higher density). Dr. Blue realizes that the contact rate with other people will be higher in Club 2 because the density is greater. The more people in the club, the more likely Dr. Blue is to get close enough to one of them to acquire some of their germs. That is, **the contact rate (c) is density-dependent**.
+
+**Scenario 2**
+
+In the previous scenario, we were talking about the types of contacts that lead to transmission of the flu, rhinovirus, etc.  What if we were talking about STDs instead?  Does the probability of contact leading to an STD infection (i.e., the probability of having sex with one of the club-goers) increase with the density of people in the club?  No (for the most part).  If Dr. Blue is going to have sex with one of the club-goers, it is unlikely to depend on whether there are 50 or 100 club-goers.  **The contact rate (c’) is not density-dependent.** 
+
+The caveat is that contact rate might be density-dependent at very low densities.  Like, if Dr. Blue walks into the club and there are only two club-goers, both of whom have not bathed in a year, the probability of sexual contact will likely be much lower than if Dr. Blue walks into a club with 50 club-goers.
+
+::: recap
+**The difference between density-dependent (DD) and frequency-dependent (FD) transmission**
+
+In DD transmission, the contact rate (c) depends on the population density, which often applies to airborne diseases like the flu or measles. In FD transmission, the contact rate (c’) does not depend on the population density, which often applies to sexually transmitted diseases like HIV.
+:::
+
+## The DD and FD Contact Rates are Different
+
+We can summarize what we’ve learned about contact rates in DD and FD transmission in a graph, and assign equations to the two straight lines.
+
+![](images/dd-vs-fd_c_functions.png){width="437"}
+
+-   *In DD transmission*, the contact rate (c) increases with the population density, where density is just the total number of individuals in the population (N) divided by the area (A).  We usually assume that the relationship between c and N/A is linear, with a slope of k and an intercept of 0.
+
+-   *In FD transmission*, the contact rate (c’) is usually not affected by the population density (N/A) – see the green dashed line.  That is, the line for c’ has an intercept of n and a slope of 0.  The caveat being that at in some cases, c’ does increase with density at very low densities – see the orange dashed line.
+
+This gives us the following equations:
+
+$$ DD: c = \kappa \times \frac{N}{A} $$
+
+$$ FD: c' = \eta $$
+
+# Decomposing Transmission: Force of Infection and the $\beta$ parameter
+
+## Recap of the SIR Model Framework
+
+The SIR model divides the population into three compartments:
+
+-   **Susceptible (S)**: Individuals who can contract the disease-causing pathogen.
+-   **Infectious (I)**: Individuals who have contracted the pathogen and can transmit it to others.
+-   **Recovered (R)**: Individuals who have recovered from the disease and have immunity against it.
+
+![](images/sir_model_intro.png){width="534"}
+
+## The Transmission Term
+
+### Density-dependent Model ODEs
+
+The transitions between these in states in a DD model are governed by the following differential equations:
+
+$$ \frac{dS}{dt} = - \beta SI $$
+
+$$ \frac{dI}{dt} = \beta SI - \gamma I $$
+
+$$ \frac{dR}{dt} = \gamma I $$
+
+The transmission term of the model described above is $\beta SI$.
+
+### Frequency-dependent Model ODEs
+
+The transitions between these in states in a FD model are governed by the following differential equations:
+
+$$ \frac{dS}{dt} = - \frac{\beta SI}{N} $$
+
+$$ \frac{dI}{dt} = \frac{\beta SI}{N} - \gamma I $$
+
+$$ \frac{dR}{dt} = \gamma I $$
+
+The transmission rate of the model described above is $\frac{\beta SI}{N}$.
+
+The transmission term appears both in equations describing the changing numbers of susceptible hosts, dS/dt, as a ‘loss’ term (-βSI or -βSI/N), and also in equations describing the changing numbers of infected hosts, dI/dt, as a ‘gain’ term (+βSI or +βSI/N), counteracted by the loss of infecteds through recovery (-γI).
+
+In this lesson, for clarity, we look at only with the infected-host equation, and we omit the loss term. From now on, dI/dt will refer only to the rate of increase, through new infection, in the number of infecteds.
+
+Ignoring all other model terms, and focusing solely on the transmission terms, the classic equations for DD and FD transmission are:
+
+$$ DD:  \frac{dI}{dt} = \beta SI $$
+
+$$ FD:   \frac{dI}{dt} = \beta' S\frac{I}{N} $$
+
+You’ll notice two key differences between these transmission terms:
+
+1.  For DD, there is a parameter β, and for FD, there is a parameter β’.  Both of these variables are *transmission rates*. However, the prime indicates that **β =/= β’**, which is a very important distinction.
+
+2.  DD equation have just an I, while the FD equation has an I/N.
+
+Both of these can be explained by understanding an important parameter: the **force of infection**.
+
+## Force of Infection
+
+When we look at the transmission term in dI/dt equations, we’re asking, “What is the rate of increase in the number of infected individuals in the population, through new infection?”. This rate increases with the number of susceptible hosts (S) multiplied by a per capita rate of infection, referred to as the ‘force of infection’.
+
+> The **force of infection (FOI)** is defined as the per capita rate at which susceptible individuals get infected.
+
+We can represent FOI in the transmission term like so:
+
+$$ \frac{dI}{dt} = FOI \times S $$ $$ = \lambda \times S $$
+
+Where λ is the force of infection term.
+
+Therefore, Another way to look at the DD and FD transmission equations is:
+
+$$ DD:  \frac{dI}{dt} = \lambda \times S $$
+
+$$ FD:   \frac{dI}{dt} = \lambda' \times S $$
+
+Again, the prime means that λ =/= λ’.
+
+The force of infection is the product of three probabilities/rates:
+
+1.  the rate of contacts, c, which are of an appropriate type for transmission to be possible
+
+2.  the probability, p, that a contact is indeed with an infectious host, and
+
+3.  the probability, ν, that contact between an infectious and a susceptible host does in fact lead to transmission (i.e. the contact is ‘successful’)
+
+$$ FOI = \lambda = cpv $$
+
+This gives rise to the following basic equation:
+
+$$ \frac{dI}{dt} = \lambda \times S $$ $$ = cpv \times S $$
+
+The probability that the contact is with an infectious host, p, is usually assumed to be I/N, the prevalence of infection within the population. This depends on the assumption that infected and susceptible hosts mix completely with each other and move randomly within an arena of fixed size.
+
+We can substitute p with I/N to give:
+
+$$ \frac{dI}{dt} = c \times v \times \frac{I}{N} \times S$$
+
+The probability of successful transmission, ν, is usually assumed to be constant for any given host-pathogen combination.
+
+Since p and ν are constant, then the difference between DD and FD transmission terms (β vs β’) and forces of infection (λ vs λ’) must be explained on the basis of the contact rate, c.
+
+$$ DD: \frac{dI}{dt} = c \times v \times \frac{I}{N} \times S$$
+
+$$ FD: \frac{dI}{dt} = c' \times v \times \frac{I}{N} \times S$$
+
+The main difference is that the DD contact rate c is a function of density, and the FD contact rate c’ is a constant .
+
+To understand this clearly, let's revisit the graph of contact rate functions for DD and FD transmission:
+
+![](images/dd-vs-fd_c_functions.png){width="476"}
+
+The line equations for DD and FD contact rate functions are:
+
+$$ DD: c = \kappa \times \frac{N}{A} $$
+
+$$ FD: c' = \eta $$
+
+Let's plug in these line equations into our dI/dt expressions:
+
+$$ DD: \frac{dI}{dt} = \kappa \times \frac{N}{A} \times v \times \frac{I}{N} \times S$$
+
+$$ FD: \frac{dI}{dt} = \eta \times v \times \frac{I}{N} \times S$$
+
+Note that in the DD equation, not only does the contact rate increase with the overall density of the host, N/A; the per capita force of infection also increases with the density of infecteds, I/A.
+
+In the FD equation, the per capita force of infection increases with the prevalence of infection, I/N, which might also be called the ‘frequency’ of infecteds.
+
+We can simplify the DD equation because N occurs in both the numerator and the denominator:
+
+$$ DD: \frac{dI}{dt} = \kappa \times v \times \frac {SI}{A} $$
+
+$$ FD: \frac{dI}{dt} = \eta \times v \times \frac{SI}{N}$$
+
+For DD transmission, the product κν is usually referred to as β, the transmission coefficient. For FD transmission, the product ην may be referred to as β', another transmission coefficient (albeit with different dimensions to β).
+
+This leads to the following equations:
+
+This is now starting to look like our original transmission terms: $\beta SI$ for DD and $\frac{\beta SI}{N}$ for FD.
+
+$$ DD:   \frac{dI}{dt} = \frac{\beta SI}{A} $$
+
+$$ FD:   \frac{dI}{dt} = \frac{\beta' SI}{N} $$
+
+You may notice that the DD transmission term has an I/A, instead of just an I, which is what we normally use. Actually, this version *more* correct, although people very commonly (and wrongly) don’t include the A. However, if the area that a population occupies is constant and/or we’re comparing different populations who occupy the same sized areas, then A = 1 and we can leave the A out of the equation.  This brings us to the DD and FD equations that we know and love:
+
+$$ DD:  \frac{dI}{dt} = \beta SI $$
+
+$$ FD:   \frac{dI}{dt} = \beta' S\frac{I}{N} $$
+
+Keep in mind that this version of the DD transmission term should only strictly be used if an assumption of constant area over time is acknowledged.
+
+# When to model DD or FD
+
+-   Frequency-dependent transmission is typically more appropriate for large populations with heterogeneous mixing, sexually transmitted diseases, and vector-borne pathogens.
+-   Density-dependent transmission is usually used to represent diseases in wildlife and livestock, especially in smaller population sizes.
+-   Empirical evidence suggests that many disease systems are intermediate, necessitating a flexible approach to modeling transmission dynamics.
+
+![](images/clipboard-1203171067.png){width="506"}
+
+::: side-note
+## Disease Transmission Routes
+
+**Directly transmitted diseases**
+
+Close contact between susceptible and infectious individuals in close proximity.
+
+-   **Person-to-person contact** - transmitted via touch or through the skin or mucus membranes (e.g., Ebola, hookworm, scabies).
+
+-   **Respiratory droplet transmission** (e.g., COVID-19, pandemic influenza, tuberculosis)
+
+-   **Sexually transmitted infections (STIs)** and intravenous infections (e.g., HIV, syphilis, Hepatitis B)
+
+**Indirect contact transmission**
+
+-   **Airborne transmission** – caused by pathogens that spread through the air when an infected person coughs, sneezes, talks, or even breathes (e.g., measles, chicken pox, influenza)
+
+-   **Food-and-drink borne diseases**: pathogens are transmitted by ingesting food or drink.
+
+    -   E.g., Cholera (water), brucellosis (milk), *E.coli* (meat or produce)
+
+-   **Insect vector-borne**: Involving intermediaries such as:
+
+    -   Mosquitoes (e.g., malaria, dengue, Zika)
+
+    -   Fleas (e.g., typhus, plague)
+
+    -   Ticks (e.g., Lyme disease, Rocky Mountain spotted fever)
+
+-   **Environmental**: Involving contamination of surroundings. Soil, water, and vegetation containing infectious organisms.
+
+    -   Tetanus
+
+    -   Botulism
+
+    -   Cholera
+
+-   **Zoonotic** - Animal-to-human transmission, such as:
+
+    -   Nipah Virus
+
+    -   Hendra Virus
+:::
+
+# Conclusion
+
+Differentiating between density-dependent and frequency-dependent transmission is vital for constructing SIR models. For example, a respiratory virus that is transmitted when people cough or sneeze will be modeled with different assumptions than a bacterial infection that spreads via touch.
+
+Understanding how a disease spreads will inform the mathematical equations in your transmission term, and lead to better predictions of epidemic dynamics.
+
+# Contributors {.unlisted .unnumbered}
+
+The following team members contributed to this lesson:
+
+`r .tgc_contributors_list(ids = c("joy", "sabina"))`
+
+`r .tgc_license()`

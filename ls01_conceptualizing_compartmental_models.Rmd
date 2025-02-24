@@ -1,0 +1,317 @@
+---
+title: 'Lesson 1 | Introduction to Compartmental Models for Epidemiology'
+output:
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+    css: !expr here::here("global/style/style.css")
+    highlight: kate
+editor_options:
+  markdown:
+    wrap: 100
+  canonical: true
+  chunk_output_type: inline
+---
+
+```{r, echo = F, message = F, warning = F}
+# Load packages 
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load(rlang, tidyverse, knitr, here, reactable, gt, flextable)
+
+# Functions
+source(here::here("global/functions/lesson_functions.R"))
+```
+
+------------------------------------------------------------------------
+
+# Introduction {.unnumbered}
+
+Mathematical models in infectious disease epidemiology, specifically compartmental models, provide a structured way to understand and predict how diseases spread. By dividing the population into categories based on their disease status, these models help us simulate and analyze the course of an epidemic.
+
+Today, you'll learn why mathematical models are essential in epidemiology and get an introduction to the basics of the SIR model, a simple type of compartmental model.
+
+Let's dive in!
+
+# Learning Objectives {.unnumbered}
+
+By the end of this lesson, you should be able to:
+
+-   Understand and explain the significance of mathematical models in epidemiology for informing public health measures.
+
+-   Understand and explain what a mathematical model is.
+
+-   Explain the fundamental concepts and importance of compartmental models in epidemiology.
+
+-   Describe the SIR model and its role in understanding disease dynamics.
+
+# Significance and Applications of Epidemiological Models
+
+Mathematical models in epidemiology are indispensable tools that simplify the complex realities of epidemics and disease transmission into understandable and actionable insights. The origins of these models date back to Daniel Bernoulli in 1760, who used mathematical analysis to study the impact of smallpox inoculation.
+
+Since then, epidemiological modeling has become a cornerstone in public health strategy formulation and understanding disease spread dynamics.
+
+::: vocab
+**What is a mathematical model?**
+
+A mathematical or computational model describes a practical problem using mathematical language (e.g., equations, graphs, algorithms). Real-world systems can be approximated in mathematical language to understand or simulate the behavior of the system. Mathematical solutions can then be translated to real-world solutions.
+
+DISAMBIGUATION: not to be confused with statistical models.
+:::
+
+The most commonly used models in epidemiology are “compartment models” which were devised during the late 1920s (Kermack & McKendric). Probably the most well-known of these is the SIR model for infectious diseases. The SIR model and its variations will be the main focus of this course.
+
+Over time, epidemiological models have evolved from simple theoretical constructs to sophisticated simulations that incorporate numerous factors influencing disease transmission. These models have been crucial in understanding various infectious diseases, from HIV and Ebola to the COVID-19 pandemic.
+
+Epidemiological models are valuable in public health for several key applications:
+
+1.  **Understanding Epidemic Mechanisms:** By simulating disease transmission dynamics, these models provide insights into epidemic mechanisms, such as disease incubation, transmission rates, and population immunity.
+2.  **Evaluation of Intervention Strategies:** They allow the assessment of the effectiveness of different intervention strategies, such as vaccination programs and social distancing measures, in controlling disease spread.
+3.  **Prediction of Disease Trends:** These models help health professionals and policymakers forecast the trajectories of infectious diseases, enabling better allocation of preventive measures and resources.
+
+# Abstraction in Mathematical Models
+
+Creating a mathematical model involves simplifying the complex reality into more manageable, abstract forms. This process allows us to focus on key elements that influence disease transmission while acknowledging that some real-world complexities must be set aside to create a workable model.
+
+![](../images/abstraction.png)
+
+::: vocab
+**What is abstraction in mathematical modelling?**
+
+Abstraction is the cognitive process of simplifying, generalizing, or distilling complex ideas or concepts. In mathematics, abstraction involves creating simplified models to understand complex systems through conceptualization.
+:::
+
+Abstraction in modeling focuses on critical elements like population density and transmission rates, while less significant factors are overlooked.
+
+However, these models must be interpreted cautiously due to assumptions that may overlook diverse individual behaviors during an epidemic. Models are tested and refined against actual data to improve their accuracy and usefulness, especially in public health contexts.
+
+::: practice
+**Question 1:** What is the purpose of abstraction in mathematical modelling?
+
+a)  It ensures that all real-world complexities are included in the model.
+b)  It simplifies the complex reality into more manageable, abstract forms.
+c)  It makes the model more complex by adding unnecessary details.
+d)  It guarantees the model will perfectly predict real-world outcomes.
+:::
+
+# Understanding the Dynamics of Infectious Diseases
+
+Let's look at data from a few real-life disease outbreaks. The figure below shows five distinct infectious disease epidemics in different populations around the world. Each graph shows the number of cases recorded over time. Can you spot any similarities in the trajectories of these epidemics?
+
+![](../images/epi_curves.png)
+
+Each outbreak starts off at zero, followed by an exponential increase in infections until reaching a "peak", and then rapidly declining until the epidemic "dies out". Note the three peaks in the H1N1 epidemic, indicating overlapping outbreaks.
+
+![](../images/bell_shaped_curves.gif)
+
+These epidemic curves show typical outbreak patterns: a rise in cases (invasion), a peak, and a decline (extinction). This pattern is known as a **bell-shaped curve 🔔**.
+
+## From Reality to Conceptualization
+
+Now that we understand the overall dynamics of infectious disease outbreaks, let's examine the influenza outbreak in a boarding school in Northern England in 1978 and abstract it step-by-step:
+
+![](../images/influenza_boarding_original.png){width="8.8cm"}
+
+This influenza epidemic occurred at a boarding school in northern England, affecting 763 boys aged 10 to 18. The initial increase in infections was rapid, reaching a peak within seven days before gradually declining as more individuals recovered or became immune.
+
+Influenza is a highly infectious airborne virus, so we can imagine that one student can transmit the disease to several others, as they are living in close proximity.
+
+Let's start our abstraction.
+
+Let's say this initially infected person infects some people, and those infected infect others, and so on:
+
+![](../images/simple_model_infection.png){width="8.5cm" height="5.1cm"}
+
+If we look at the first few days of our influenza outbreak graph, we can see that infections not only increase each day, but they increase **exponentially**.
+
+This initial pattern fits well with a exponential model, where the number of infections on a given day is a constant multiple of the previous day's count.
+
+Let's graph a simple exponential model against the real-life flu outbreak in Northern England in 1978 and see how it compares:
+
+![](../images/prediction_infected.png){width="358"}
+
+The exponential red line (our exponential model) mirrors the initial phase of the outbreak well but then diverges significantly and continues into infinity, indicating the need for a more refined model.
+
+The reason this model fails is because we have omitted many essential aspects. Our model focused solely on infectious individuals, without taking the rest of the population into account.
+
+For example, diseases in real life will eventually run out of uninfected individuals to infect as the number of susceptible individuals is finite. This limits the spread of the disease. Additionally, the model doesn't account for the natural tapering of the epidemic. Diseases do not exhibit exponential growth indefinitely due to factors such as recovery, immunity, and behavioral changes.
+
+To better capture the dynamics of disease spread, we can use **compartmental models**, such as the simple **SI model** for infectious diseases.
+
+::: practice
+**Question 2:** Which of the following statements best describes why the simple exponential model is not accurate for predicting the entire course of an epidemic?
+
+a)  It does not account for the total population size.\
+b)  It assumes that all infected individuals recover immediately.\
+c)  It includes too many compartments for simplicity.\
+d)  It underestimates the initial number of infections.
+:::
+
+## Introduction to Compartmental Models
+
+Let's revisit our abstraction, and define a population of nine individuals and project it over time. As shown in the image, all members of the population become infected as time goes by. This means that once **all** members have become infected, the number of infected individuals will plateau at a constant number.
+
+![](../images/all_infected.png){width="502"}
+
+For the sake of writing equations, we can categorize individuals in our model population into two compartments: **susceptible** individuals (blue) and **infected** individuals (red).
+
+This compartmentalization into **S**usceptible and **I**nfected individuals leads us to use a specific epidemiological model known as the **compartmental model**. We will go into the specifics of the equations in the next lesson, but for now we will just focus on the model results, and not the model equations themselves.
+
+Over time, susceptible individuals transition from being "healthy" to becoming "infected" until the entire population is infected, and the disease runs out of susceptible individuals.
+
+![](images/infection_nine.gif){width="524"}
+
+::: vocab
+**What is a compartmental model?**
+
+A compartmental model is a mathematical framework used to describe the spread of infectious diseases, population dynamics, or other complex systems by dividing the population into distinct compartments or groups. Each compartment represents a specific state or condition of individuals within the system, and the model tracks the movement of individuals between these compartments over time. These transitions are governed by a series of linked mathematical equations describing the rates of movement between states. The equations are called ordinary differential equations (ODEs), which we cover in the next lesson.
+:::
+
+::: practice
+**Question 3:** What is a compartmental model in epidemiology?
+
+a)  A method to measure individual health.\
+b)  A mathematical framework used to describe the spread of infectious diseases by dividing the population into distinct compartments.\
+c)  A tool for measuring the economic impact of diseases.\
+d)  A statistical technique to analyze survey data.
+:::
+
+## The SI Model
+
+With compartmentalization and the transition of individuals over time, let's explore a simple compartmental model - the **SI model**.
+
+![](../images/si_model_intro.png){width="350"}
+
+The SI model consists of two compartments:
+
+-   **Susceptible (S)**: Individuals who can become infected.
+-   **Infected (I)**: Individuals who are infected and can transmit the disease.
+
+And one critical parameter:
+
+-   **Transmission coefficient (β)**: A parameter of infectivity, i.e., the rate at which susceptible individuals become infected.
+
+In addition, all compartmental models require initial conditions in the model frameworks as they define the starting point of the model. For example, in the SI model, we need to specify the initial number of susceptible and infected individuals. This helps in understanding how the disease will spread from the beginning.
+
+Let's revisit our flu outbreak data and fit the SI model over it. In this case, we specified a total population of 762 boys in the boarding school, and started with 1 infectious individual. After adjusting the transmission rate parameter, the best fit we can get from the SI model is graphed below:
+
+![](../images/si_infected_graph.png)
+
+As with the previous exponential model, the SI model captures the beginning of the outbreak well but fails to show the decline in the number of infected individuals, as seen in the real-world data. However, there is an important improvement: the outbreak no longer goes to infinity, which is impossible in the real world. Instead, the outbreak tapers and plateaus at the total population of 762 individuals. This does not reflect the outbreak trajectory we see in the raw data, but it is a more realistic an plausible trajectory of a disease outbreak.
+
+In order to improve the model, we need to identify what's missing. What real-life aspect of the epidemic are we failing to capture in our abstract version? Why did the number of infections decrease instead of all the boys getting infected?
+
+In this case, the real-life aspect we're failing to capture is the recovery process. In reality, people infected with the flu don't stay infected forever. They eventually recover and are no longer able to pass on the disease. The existence of immunity and decline of infectiousness is the reason why not all individuals in an influenza outbreak get infected during an epidemic.
+
+We can refine the model by adding a recovered category of individuals.
+
+::: practice
+**Question 4:** Which parameter in the SI model represents the rate at which susceptible individuals become infected?
+
+a)  Recovery coefficient (γ)\
+b)  Transmission coefficient (β)\
+c)  Incubation coefficient (α)\
+d)  Mortality coefficient (μ)
+:::
+
+## The SIR Model
+
+In the SI model, infected individuals stay infected - and therefore infectious - forever, until the whole population is infected. To improve our model, we need to consider that for certain diseases such as the flu, individuals eventually recover after becoming infected and no longer pass on the disease to others.
+
+This leads us to the **SIR model**, which includes a third compartment:
+
+![](../images/sir_model_intro.png)
+
+The SIR model consists of three compartments:
+
+-   **Susceptible (S)**: Individuals who can become infected.
+-   **Infected (I)**: Individuals who are infected and can transmit the disease.
+-   **Recovered (R)**: Individuals who have recovered and are no longer infectious.
+
+And two critical parameters:
+
+-   **Transmission coefficient (β)**: A parameter of infectivity, i.e., the rate at which susceptible individuals become infected.
+-   **Recovery coefficient (γ)**: A parameter of recovery, i.e., the rate at which infected individuals recover.
+
+If we update the equations to include the Recovered compartment and the recovery rate parameter, we can get a better fit to the real data. Let's graph the SIR model against our flu outbreak data.
+
+![](../images/sir_infected_graph.png)
+
+The SIR model matches the epidemic curve and fits the data well, capturing both the rise and fall of infected individuals over time. With the SIR model fitting well, we can gain valuable insights into the infection dynamics, such as the peak of the epidemic, the duration of the outbreak, and the effectiveness of intervention strategies.
+
+The SIR model is one of the most typical examples of compartmental models used in epidemiology. It belongs to a broader family of SIR-like models, which include variations such as SEIR, SIRS, and SEIRS models. These models provide more nuanced understandings of disease dynamics by incorporating additional compartments and parameters.
+
+::: side-note
+**Types of Compartmental Models for Disease Transmission**
+
+Beyond the SI and SIR models, several other compartmental models add complexity to capture more realistic disease dynamics, each addresses different aspects of infectious diseases, depending on the nature of the disease and the research questions.
+
+Below are some examples of different types of compartmental models:
+
+![](../images/compartmental_models.png)
+
+One of the more complex compartmental model shown above are the SEIR and SEIRS models which introduce a new compartmenta for **Exposed** individuals. The exposed compartment represents individuals who have been infected by the pathogen but have **not started transmitting the infection** to others. An example of the use of the SEIR/SEIRS framework is to model COVID-19 disease outbreaks.
+:::
+
+::: practice
+**Question 5:** In the context of the SIR model, how can you describe individuals in the `Recovered` compartment?
+
+a)  Individuals who can become infected
+b)  Individuals who are infected and can infect others
+c)  Individuals who are no longer infectious
+d)  Individuals who are infected but can not yet infect other individuals
+:::
+
+# Conclusion
+
+In this lesson, you learned about the SI and SIR compartmental models, fundamental tools in epidemiological modeling. By simulating disease spread and recovery in a population, these models provide valuable insights into the potential course of an epidemic and the effectiveness of various public health interventions.
+
+# Answer Key {.unnumbered}
+
+:::answer
+**Question 1**
+
+b) It simplifies the complex reality into more manageable, abstract forms.
+:::
+
+:::answer
+**Question 2** 
+
+a) It does not account for the total population size.
+:::
+
+:::answer
+**Question 3** 
+
+b) A mathematical framework used to describe the spread of infectious diseases by dividing the population into distinct compartments.
+:::
+
+:::answer
+**Question 4** 
+
+b) Transmission coefficient (β)
+:::
+
+
+:::answer
+**Question 5** 
+
+c) Individuals who are no longer infectious
+:::
+
+# Contributors {.unlisted .unnumbered}
+
+The following team members contributed to this lesson:
+
+`r .tgc_contributors_list(ids = c("sabina", "joy"))`
+
+## References {.unlisted .unnumbered}
+
+-   NEWS AND NOTES." 1978. *British Medical Journal* 1, no. 6112: 586–590.
+Here are the citations formatted in Chicago style:
+-   The Novel Coronavirus Pneumonia Emergency Response Epidemiology Team. "The Epidemiological Characteristics of an Outbreak of 2019 Novel Coronavirus Diseases (COVID-19) — China, 2020." *China CDC Weekly* 2, no. 8 (2020): 113-122. https://doi.org/10.46234/ccdcw2020.032.
+-   Davies, Gareth. "The Foot and Mouth Disease (FMD) Epidemic in the United Kingdom 2001." *Comparative Immunology, Microbiology and Infectious Diseases* 25, no. 5–6 (2002): 331-343. https://doi.org/10.1016/S0147-9571(02)00030-9.
+-   Fang, Li-Qun, et al. "Transmission Dynamics of Ebola Virus Disease and Intervention Effectiveness in Sierra Leone." *Proceedings of the National Academy of Sciences* 113 (2016): 1518587113. https://doi.org/10.1073/pnas.1518587113.
+-   White, P. J. "Mathematical Models in Infectious Disease Epidemiology." In *Infectious Diseases*, 49–53.e1. 2017. <https://doi.org/10.1016/B978-0-7020-6285-8.00005-8>.
+
+`r .tgc_license()`

@@ -1,0 +1,440 @@
+---
+title: 'Lesson 2 | Introduction to Ordinary Differential Equations (ODEs) and the SIR Model'
+output:
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+    css: !expr here::here("global/style/style.css")
+    highlight: kate
+editor_options:
+  markdown:
+    wrap: 100
+  canonical: true
+  chunk_output_type: inline
+---
+
+```{r, echo = F, message = F, warning = F}
+# Load packages 
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load(rlang, tidyverse, knitr, here, reactable, gt, flextable)
+
+# Source functions 
+source(here("global/functions/lesson_functions.R"))
+
+# Knitr options
+knitr::opts_chunk$set(warning = F, message = F, class.source = "tgc-code-block", error = T)
+```
+
+------------------------------------------------------------------------
+
+# Introduction {.unnumbered}
+
+During the previous lesson, we explored the conceptualization of the SI and SIR models using the example of the flu epidemic of 1978 in a boarding school.
+
+For today's lesson, we will continue to use this example but this time we will develop a model for this influenza outbreak together to understand the steps behind the development of such epidemiological models.
+
+Today, you will learn how to formulate your problem and objectives, and how to use conceptual model diagrams to write dynamic equations used in epidemiological mathematical models.
+
+Let's get started!
+
+# Learning objectives {.unnumbered}
+
+By the end of this lesson, you should be able to:
+
+-   Understand and explain the steps in developing a model
+
+-   Understand mathematical concepts and equations that make up the SIR model.
+
+-   Use conceptual model diagrams to write dynamic equations.
+
+-   Conceive and write ordinary differential equations used to create mathematical models
+
+# Developing a Model
+
+Developing a mathematical model involves a series of structured steps that help us understand complex systems and predict their behavior under various conditions. This process can be broken down into **four main steps**. Each step builds upon the previous one, starting from the initial formulation of the problem to the implementation of the model in computer code. These steps ensure that the model is both scientifically accurate and practically useful.
+
+The four steps are as following:
+
+1)  Formulate Problem and Objectives
+2)  Conceptual Model Diagram
+3)  Dynamic Equations
+4)  Computer Code
+
+Today's lesson will cover steps 1 (Formulate Problem and Objectives) through 3 (Dynamic Equations). The last step, computer code, will be covered in our next lesson.
+
+# Step 1: Formulate Problem and Objectives
+
+Any scientific project requires clearly defining the problem and setting objectives. For an SIR model, this might involve understanding how a disease spreads through a population, predicting the number of susceptible, infected, and recovered individuals over time, estimating the peak of an infection, assessing the total number of infections over a period, and evaluating the impact of interventions such as vaccination or quarantine.
+
+To define our problem and objectives, we need to ask ourselves some pertinent questions that will allow us to better understand the dynamic of the disease we are trying to model:
+
+-   What is the total population that can become infected?
+
+-   What is the transmission route of the disease?
+
+-   How long does it take individuals to recover?
+
+-   How infectious is the disease?
+
+Let's go back to the boarding school's influenza outbreak of 1978 and try to answer some of those questions.
+
+::: key-point
+**Epidemiological Summary of the Boarding School Influenza Outbreak**
+
+![](../images/influenza_boarding_original.png){width="357"}
+
+In January, an influenza epidemic occurred at a boarding school in northern England, with a total of population at risk of 763 boys aged 10 to 18. The outbreak began shortly after the boys returned from holidays on January 10. The first case, a boy from Hong Kong, presented with a febrile illness from January 15 to 18. By January 22, three boys were in the infirmary, and the outbreak rapidly escalated.
+
+The average duration of illness was three to seven days, with most boys returning to class within five to six days.
+
+The influenza virus spread quickly, reaching its peak within seven days and subsiding after 13 days. Throat swabs confirmed the presence of influenza A (H1N1) virus. Despite the vaccination of 630 boys with the influenza vaccine Fluvirin in October 1977, the outbreak was more rapid compared to previous influenza epidemics in 1954 and 1957, likely due to an antigenic shift.
+
+Among the 130 adults in contact with the boys, only one house matron developed similar symptoms. Complications were relatively rare, with a few cases of bacterial pneumonia, bronchitis, otitis media, and sinusitis, all responding well to antibiotic treatment.
+:::
+
+When trying to formulate the problem using our pertinent questions we get the following:
+
+-   **Total Population at Risk:** The boarding school consists of 763 boys (students) and 130 adults (staff). For our model, we will consider only the *students* as the population at risk, given the minimal contact with staff and only one staff member exhibiting symptoms. Although this is a simplification and does not account for staff interactions or external visits, it is a reasonable assumption. The population is considered closed due to the absence of births, deaths, and significant influxes or outflows. Despite this simplification, the model effectively captures the essential elements necessary for our analysis.
+
+-   **Transmission Route of the Disease:** Influenza is primarily transmitted through respiratory droplets when an infected person coughs or sneezes. In a boarding school setting, close contact among students facilitates the rapid spread of the virus.
+
+-   **Recovery Time:** The recovery time for the boys affected by the influenza outbreak ranged from three to seven days, with the average time off sick being five to six days. Some cases, such as those with complications like bacterial pneumonia or bronchitis, required longer recovery times of up to ten days.
+
+-   **Infectiousness of the Disease:** The virus spread rapidly, peaking in seven days and subsiding in thirteen days. This suggests a highly infectious strain, similar to the influenza A virus (H1N1) identified in the throat swabs of the affected boys.
+
+# Step 2: Conceptual Model Diagram
+
+After formulating the problem and the objectives, we can proceed to the second step: **Conceptual Model Diagram**.
+
+In this step, we will need to use compartmental models to conceptualize the disease dynamic and pick the appropriate model structure.
+
+## What model structure should we use?
+
+Several compartmental models structures can be used to conceptualize disease outbreaks. As mentioned in our previous lesson, there exists a big variety of compartmental models. Choosing an appropriate model structure requires us to take into account different aspects of the disease we want to model.
+
+### **Types of Compartmental Models for Disease Transmission**
+
+The examples below are common variations of the classic **SIR model**.
+
+![](../images/compartmental_models.png)
+
+The compartmental model structure for an infectious disease is mainly determined by pathogen biology and immunology. For instance, an **SEIR model** might be appropriate for a disease has a latent period, such as tuberculosis or COVID-19. For diseases with short-term immunity, a **SIRS model** could be better suited because individuals could become re-infected with the disease after recovery. An **SI model** is best suited for diseases that result in lifelong infection, such as herpes. They can also be used to model fatal infections.
+
+To select the most appropriate model structure, we need to consider what we know about the disease we want to model and:
+
+-   Identify the key compartments that individuals should be categorized into
+-   Determine the interaction and transition between the compartments
+-   List any assumptions we need to make
+
+Given the nature of the 1978 influenza outbreak at the boarding school, let's select the most appropriate model. The influenza strain in this case study is an **acute infection** with **lifelong immunity**. Therefore, the SIR model is most appropriate.
+
+-   **Key Compartments**: Susceptible (S), Infected (I), Recovered (R)
+-   **Interactions/Transitions**:
+    -   Susceptible individuals (S) become infected (I) at a rate proportional to the contact between susceptible and infected individuals.
+    -   Infected individuals (I) recover (R) at a certain rate, gaining immunity.
+-   **Assumptions**:
+    -   The total population size is constant (no births, deaths, influxes, nor outflows).
+    -   Infected individuals are also infectious.
+    -   Individuals who recover gain permanent immunity.
+    -   The disease transmission rate and recovery rate are constant over time.
+
+Based on this, we can determine that the **SIR Model** is the appropriate model to use.
+
+### Recap of the SIR Model Framework
+
+Let's review our SIR model:
+
+::: recap
+**The SIR Model**
+
+![](../images/sir_model_intro.png){width="408"}
+
+The SIR model consists of three compartments:
+
+-   **Susceptible (S)**: Individuals who can become infected.
+-   **Infected (I)**: Individuals who are infected and can transmit the disease.
+-   **Recovered (R)**: Individuals who have recovered and are no longer infectious. They are immune to reinfection.
+
+And two critical parameters:
+
+-   **Transmission coefficient (β)**: The rate**\*** at which susceptible individuals become infected.
+-   **Recovery rate (γ)**: The rate at which infected individuals recover.
+
+**\***Beta is not strictly a rate; it combines the contact rate between individuals in the population and the probability of infection upon contact. We will explore this in more detail in future lessons.
+:::
+
+The transitions between each states for this *closed* SIR model are governed by the following differential equations.
+
+$$
+\frac{dS}{dt} = - \beta SI 
+$$
+
+$$
+\frac{dI}{dt} = \beta SI - \gamma I 
+$$
+
+$$
+\frac{dR}{dt} = \gamma I 
+$$
+
+Where: $\beta$ is the transmission rate, and $\gamma$ is the recovery rate.
+
+*Note: These differential equations are specific to a closed SIR model (no births, deaths, influx, or outflow of individuals). We will introduce a model containing inflow conditions in another lesson.*
+
+::: practice
+**Exercise 1**
+
+**Background:**
+
+HIV (Human Immunodeficiency Virus) is a chronic viral infection with no cure, where infected individuals remain infectious for life. It spreads through unprotected sexual contact, sharing of needles, or from mother to child. Health officials want to model the spread of HIV to anticipate future cases and evaluate prevention programs.
+
+**Task:**
+
+1.  **Select the Compartmental Model**: Based on the transmission and chronic nature of HIV, choose the most appropriate compartmental model (SI, SIR, SEIR...).
+2.  **Model Diagram**: Draw the conceptual model diagram showing compartments and transitions.
+:::
+
+# Step 3: Dynamic Equations
+
+Now that we have selected our model structure, let's move to the next step: **Dynamic Equations**
+
+In order to write our mathematical equation for the SIR model, we first need to briefly understand **dynamic systems**.
+
+::: vocab
+\*\* Dynamical Systems\*\*
+
+Dynamical systems are systems that change over time.
+
+The dominant way of modeling how such systems evolve is by means of **differential equations**. Differential equations describe the relationships between the rates of change of various quantities and other features of the system.
+:::
+
+To understand how dynamic systems change over time, we can use a simple analogy of water in a bathtub. This example helps illustrate the fundamental principles behind differential equations, which are crucial for modeling various real-world systems, including epidemiological models like the SIR model.
+
+## Defining the Problem
+
+Let's take the example of a bathtub with water inflow and outflow:
+
+![](../images/bath_tub_example.png){width="315"}
+
+Our goal is to develop a dynamic equation that describes how $W_t$ changes over time based on the rates of water inflow $I$ and outflow $O$.
+
+## Formulating the Dynamic Equation
+
+In order to formulate a dynamic equation, we will need to translate the conceptual example of the bathtub into a mathematical equation. Here's a detailed breakdown of the process:
+
+1.  **Conceptual Setup:**
+
+    First, let's define the key variables involved in our problem:
+
+    -   **Amount of Water** ($W_t$): This represents the amount of water in the bathtub at any given time $t$.
+    -   **Inflow Rate** ($I$): This is the rate at which water is entering the bathtub.
+    -   **Outflow Rate** ($O$): This is the rate at which water is draining out of the bathtub.
+
+2.  **Discrete Time Interval:**
+
+    Next, we consider a small interval of time, denoted as $\Delta t$. This will help us to understand how the amount of water in the bathtub changes over a short period.
+
+    -   Imagine we are observing the water in the bathtub at two time points: at time $t$ and at a slightly later time $t + \Delta t$.
+    -   The amount of water in the bathtub at time $t + \Delta t$ can be calculated by taking the initial amount of water at time $t$, adding the amount of water that flowed in during the interval, and subtracting the amount of water that flowed out during the same interval.
+
+    Mathematically, we express this as: $$
+    W(t + \Delta t) = W_t + (\text{Inflow rate} \times \text{elapsed time}) - (\text{Outflow rate} \times \text{elapsed time})
+    $$ Simplifying, we get: $$
+    W(t + \Delta t) = W_t + I \Delta t - O \Delta t
+    $$
+
+3.  **Rearranging the Equation:**
+
+    To better understand the rate at which the amount of water in the bathtub changes, we rearrange the equation to isolate the rate of change: $$
+    \frac{W(t + \Delta t) - W_t}{\Delta t} = I - O
+    $$ This equation tells us that the change in the amount of water in the bathtub over a time interval $\Delta t$ is equal to the difference between the inflow rate and the outflow rate.
+
+4.  **Taking the Limit:**
+
+    Now, let's consider what happens when we make the time interval $\Delta t$ extremely small. This allows us to transition from looking at discrete changes to continuous changes.
+
+    -   Imagine the time interval $\Delta t$ becomes infinitely tiny, which we denote as `dt`.
+    -   Similarly, the change in the amount of water, $W(t + \Delta t) - W_t$, becomes an infinitely small change, which we denote as `dW`.
+
+    By taking the limit as $\Delta t$ approaches 0, we obtain a differential equation that represents the continuous change in the amount of water in the bathtub: $$
+    \frac{dW}{dt} = I - O
+    $$
+
+This differential equation tells us that the rate of change of the amount of water in the bathtub with respect to time is equal to the difference between the inflow rate and the outflow rate at any given moment.
+
+## Connecting to Compartment Models
+
+The bathtub analogy can be extended to understand compartment models, such as the SIR model in epidemiology. In such models, we can think of multiple linked bathtubs representing different compartments (e.g., susceptible, infectious, and recovered populations).
+
+Each compartment has its own inflow and/or outflow rates, which govern the dynamics of the entire system.
+
+1.  **Single Bathtub**: Represents one compartment where the change in quantity (water) depends on the inflow and outflow.
+
+![](../images/bath_tub_single.png){width="131"}
+
+2.  **Linked Bathtubs**: Represent multiple compartments with interactions between them, similar to the flow of water between multiple connected bathtubs.
+
+![](../images/bath_tub_linked.png){width="131"}
+
+## Deriving the Ordinary Differential Equations (ODEs)
+
+Let's now write the ODEs for the SIR model that predicts the influenza outbreak in the boarding school in Northern England.
+
+To write the ODEs for the SIR model, we need to express how the number of individuals in each compartment changes over time. The image below illustrates this process using the bathtub analogy, where the flow of individuals between compartments is similar to the flow of water between bathtubs.
+
+![](../images/bath_tub_sir_model.png){width="407"}
+
+*Note: Since the population is closed (no births, deaths, influx, nor outflux of people) the bathtub representing susceptible individuals does not have an open faucet and the bathtub for representing the recovered individuals does not have outflow.*
+
+### Susceptible (S)
+
+Susceptible individuals become infectious when they come into contact with an infectious individual. The rate at which susceptible become infected is proportional to the number of susceptible and infectious individuals, with the proportionality constant being the transmission rate $\beta$.
+
+The change in the susceptible population is given by: $$
+        S_{t+1} = S_t - \beta S_t I_t$$
+
+### Infectious (I)
+
+Infectious individuals are generated when susceptible individuals contract the disease. Infectious individuals recover at a rate $\gamma$, moving into the recovered compartment.
+
+The change in the infectious population is given by: $$
+        I_{t+1} = I_t + \beta S_t I_t - \gamma I_t$$
+
+### Recovered (R)
+
+Recovered individuals are those who have recovered from the disease and are now immune. They no longer affect the susceptible or infectious compartments.
+
+The change in the recovered population is given by: $$
+        R_{t+1} = R_t + \gamma I_t$$
+
+### Interpreting the Equations
+
+-   $S_{t+1} = S_t - \beta S_t I_t$: The number of susceptible individuals decreases as they become infected.
+-   $I_{t+1} = I_t + \beta S_t I_t - \gamma I_t$: The number of infectious individuals increases as susceptible individuals become infected and decreases as infectious individuals recover.
+-   $R_{t+1} = R_t + \gamma I_t$: The number of recovered individuals increases as infectious individuals recover.
+
+If we use an arbitrary time interval $\Delta t$ instead of an interval of one unit, we can reformulate the equations as follows:
+
+-   $S_{t+\Delta t} - S_t = - \beta S_t I_t \Delta t$
+-   $I_{t+\Delta t} - I_t = \beta S_t I_t \Delta t - \gamma I_t \Delta t$
+-   $R_{t+\Delta t} - R_t = \gamma I_t \Delta t$
+
+By denoting the change in compartment size during the time of $\Delta t$ as e.g. $\Delta S_t$, we can further divide the equations by $\Delta t$ and denote
+
+-   $\frac{\Delta S_t}{\Delta t} = - \beta S_t I_t$
+-   $\frac{\Delta I_t}{\Delta t} = \beta S_t I_t - \gamma I_t$
+-   $\frac{\Delta R_t}{\Delta t} = \gamma I_t$
+
+When we let $\Delta t$ become infinitely small, these equations become **ordinary differential equations**.
+
+-   $\frac{d S}{d t} = - \beta S I$
+-   $\frac{d I}{d t} = \beta S I - \gamma I$
+-   $\frac{d R}{d t} = \gamma I$
+
+The denotation $\frac{d S}{d t}$ means the derivative of the compartment size, in this case $S$, with respect to time.
+
+::: practice
+**Exercise 2**
+
+**Background:**
+
+HIV (Human Immunodeficiency Virus) is a chronic viral infection with no cure, where infected individuals remain infectious for life. It spreads through unprotected sexual contact, sharing of needles, or from mother to child. Health officials want to model the spread of HIV to anticipate future cases and evaluate prevention programs.
+
+**Task:**
+
+**Write the ODEs**: Formulate the ordinary differential equations (ODEs) for the SI model, including the parameter for transmission rate $\beta$.
+:::
+
+::: challenge
+**Exercise 3**
+
+**Background:**
+
+In early 2020, the world faced a rapidly spreading pandemic caused by SARS-CoV-2, the virus responsible for COVID-19. COVID-19 spreads through respiratory droplets, and the virus has a significant incubation period during which individuals are infected but not yet symptomatic or infectious. On average, the incubation period is about 5 days. Once symptoms appear, individuals are typically infectious for about 14 days. Following recovery, individuals may gain immunity for some time, but the exact duration of immunity is still uncertain.
+
+You are tasked with modeling the spread of COVID-19 in a small town of 10,000 people. The town is concerned about the rate of spread, the peak of the outbreak, and the number of people who will need medical attention.
+
+**Task:**
+
+1.  **Select the Appropriate Model**: Choose the most suitable compartmental model (e.g., SI, SIR, SEIR) based on the disease characteristics.
+2.  **Draw the Model Diagram**: Create a conceptual diagram showing the compartments and transitions.
+3.  **Write the ODEs**: Formulate the ordinary differential equations (ODEs) for the selected model, including the necessary parameters.
+:::
+
+# Conclusion
+
+This lesson introduced the development of compartmental models for epidemiology, focusing on the SIR model. We covered key steps such as formulating the problem, creating conceptual diagrams, and deriving dynamic equations. By examining a boarding school influenza outbreak, we gained practical insights into applying these models. With this foundation, you're now ready to develop your own epidemiological models.
+
+In the next lesson, we'll explore writing computational code in R to create a SIR model.
+
+# Answer Key {.unnumbered}
+
+::: answer
+**Exercise 1**
+
+1.  **Model Selection**:
+    -   The **SI model** is most appropriate for HIV due to the lifelong infectious period with no recovery, making individuals permanently infectious once infected.
+2.  **Model Diagram**:
+    -   Diagram with compartments: Susceptible (S) → Infectious (I).
+
+![](../images/si_model_intro.png){width="186"}
+:::
+
+::: answer
+**Exercise 2**
+
+**ODEs for the SI Model**:
+
+-   $\frac{dS}{dt} = -\beta S I$
+
+-   $\frac{dI}{dt} = \beta S I$
+
+**Explanation of Parameters**:
+
+-   $\beta$: Transmission rate, determining how quickly the disease spreads from infectious individuals (I) to susceptible individuals (S).
+
+In the SI model, individuals remain in the infectious state for life, meaning there is no recovery or progression to another compartment.
+:::
+
+::: answer
+**Exercise 3**
+
+1.  **Model Selection**:
+
+-   The **SEIR model** is most appropriate due to the incubation period during which individuals are exposed but not yet infectious.
+
+2.  **Model Diagram**:
+
+-   Diagram with compartments: Susceptible (S) → Exposed (E) → Infected (I) → Recovered (R).
+
+![](../images/seir_model_intro.png){width="250"}
+
+3.  **ODEs for the SEIR Model**:
+
+-   $\frac{dS}{dt} = -\beta S I$
+-   $\frac{dE}{dt} = \beta S I - \sigma E$ - $\frac{dI}{dt} = \sigma E - \gamma I$
+-   $\frac{dR}{dt} = \gamma I$ \|
+
+**Explanation of Parameters**:
+
+-   $\beta$: Transmission rate, determining how quickly the disease spreads from infectious individuals (I) to susceptible individuals (S).
+
+-   $\sigma$: Rate at which exposed individuals (E) progress to becoming infectious, reflecting the average incubation period.
+
+-   $\gamma$: Recovery rate, representing how quickly infectious individuals (I) recover and gain immunity.
+:::
+
+# Contributors {.unlisted .unnumbered}
+
+The following team members contributed to this lesson:
+
+`r .tgc_contributors_list(ids = c("sabina", "joy"))`
+
+## References {.unlisted .unnumbered}
+
+-   NEWS AND NOTES." 1978. *British Medical Journal* 1, no. 6112: 586–590.
+-   Drake Lab. "SISMID 2019: Mathematical Models of Infectious Diseases." Odum School of Ecology, University of Georgia. Accessed August 21, 2024. https://daphnia.ecology.uga.edu/drakelab/?page_id=2370.
+-   Harvard T.H. Chan School of Public Health. "Introduction to Infectious Disease Modeling." Center for Communicable Disease Dynamics. Accessed August 21, 2024. https://ccdd.hsph.harvard.edu/introduction-to-infectious-disease-modeling/.
+
+`r .tgc_license()`
